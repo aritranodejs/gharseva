@@ -14,6 +14,7 @@ const seedWorkers = async () => {
       rating: 4.8,
       isTrustVerified: true,
       isOnline: true,
+      status: 'approved',
       profilePicture: 'https://images.unsplash.com/photo-1540569014015-19a7be504e3a?w=400'
     },
     {
@@ -27,6 +28,7 @@ const seedWorkers = async () => {
       rating: 4.9,
       isTrustVerified: true,
       isOnline: true,
+      status: 'approved',
       profilePicture: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400'
     },
     {
@@ -40,6 +42,7 @@ const seedWorkers = async () => {
       rating: 4.7,
       isTrustVerified: true,
       isOnline: true,
+      status: 'approved',
       profilePicture: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400'
     }
   ]);
