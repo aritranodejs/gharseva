@@ -1,53 +1,43 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, TextInput, ActivityIndicator, Alert, ScrollView, StatusBar, Modal } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Image, ActivityIndicator, Alert, Modal, StatusBar } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
-import { 
-  ArrowLeft as ArrowIcon, 
-  User as UserIcon, 
-  Phone as PhoneIcon, 
-  Check as CheckIcon, 
-  LogOut as LogOutIcon, 
-  Wallet as WalletIcon, 
-  Briefcase as BriefcaseIcon, 
-  Camera as CameraIcon, 
-  Star as StarIcon,
-  ChevronRight as ChevronRightIcon,
-  FileText as FileTextIcon,
-  ShieldCheck as ShieldCheckIcon,
-  Plus as PlusIcon,
-  X as XIcon
-} from 'lucide-react-native';
-
-const ArrowLeft = ArrowIcon as any;
-const User = UserIcon as any;
-const Phone = PhoneIcon as any;
-const Check = CheckIcon as any;
-const LogOut = LogOutIcon as any;
-const Wallet = WalletIcon as any;
-const Briefcase = BriefcaseIcon as any;
-const Camera = CameraIcon as any;
-const Star = StarIcon as any;
-const ChevronRight = ChevronRightIcon as any;
-const FileText = FileTextIcon as any;
-const ShieldCheck = ShieldCheckIcon as any;
-const Plus = PlusIcon as any;
-const X = XIcon as any;
-
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Camera, ShieldCheck, MapPin, Star, Phone, ArrowLeft, Check, X, LogOut, Briefcase, FileText } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import api, { getImageUrl } from '../services/api';
+
+const EMOJI_MAP: Record<string, string> = {
+  'sparkles': '🧺',
+  'wrench': '🔧',
+  'bolt': '⚡',
+  'Zap': '⚡',
+  'User': '👤',
+  'Check': '✅',
+  'droplet': '🚰',
+  'paint-roller': '🎨',
+  'wind': '❄️',
+  'tv': '📺',
+  'bug': '🦟',
+  'utensils': '🍳',
+  'heart': '💓',
+  'house': '🏠'
+};
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
-  
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   
   const [phone, setPhone] = useState('');
+  const [aadhaarNumber, setAadhaarNumber] = useState('');
+  const [panNumber, setPanNumber] = useState('');
+  
   const [newAvatar, setNewAvatar] = useState<any>(null);
+  const [newAadhaarImage, setNewAadhaarImage] = useState<any>(null);
+  const [newPanImage, setNewPanImage] = useState<any>(null);
+  
   const [allCategories, setAllCategories] = useState<any[]>([]);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
@@ -57,11 +47,31 @@ export default function ProfileScreen() {
     fetchCategories();
   }, []);
 
+  const getRequirements = () => {
+    let needsPolice = false;
+    let needsCert = false;
+
+    selectedCategories.forEach(catId => {
+      const cat = allCategories.find(c => c._id === catId);
+      if (!cat) return;
+      const name = cat.name.toLowerCase();
+      if (name.includes('care') || name.includes('cook')) {
+        needsPolice = true;
+      } else if (['electrician', 'plumbing', 'painting', 'ac repair', 'appliance', 'pest control'].some(s => name.includes(s))) {
+        needsCert = true;
+      }
+    });
+
+    return { needsPolice, needsCert };
+  };
+
   const fetchProfile = async () => {
     try {
        const { data } = await api.get('/workers/profile');
        setProfile(data.data);
        setPhone(data.data.phoneNumber);
+       setAadhaarNumber(data.data.aadhaarNumber || '');
+       setPanNumber(data.data.panNumber || '');
        setSelectedCategories(data.data.categories?.map((c: any) => c._id || c) || []);
     } catch (err) {
        console.log('Error fetching profile', err);
@@ -79,16 +89,18 @@ export default function ProfileScreen() {
     }
   };
 
-  const handlePickAvatar = async () => {
+  const handlePickImage = async (field: 'avatar' | 'aadhaar' | 'pan' | 'police' | 'cert') => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       quality: 0.8,
-      aspect: [1, 1]
+      aspect: field === 'avatar' ? [1, 1] : undefined
     });
 
     if (!result.canceled) {
-      setNewAvatar(result.assets[0]);
+      if (field === 'avatar') setNewAvatar(result.assets[0]);
+      if (field === 'aadhaar') setNewAadhaarImage(result.assets[0]);
+      if (field === 'pan') setNewPanImage(result.assets[0]);
     }
   };
 
@@ -99,24 +111,29 @@ export default function ProfileScreen() {
   };
 
   const handleSave = async () => {
-    if (phone.length < 10) {
-      Alert.alert('Invalid', 'Phone number must be at least 10 digits.');
-      return;
-    }
-
+    const { needsPolice, needsCert } = getRequirements();
+    
     setSaving(true);
     try {
       const formData = new FormData();
       formData.append('phoneNumber', phone);
+      formData.append('aadhaarNumber', aadhaarNumber);
+      formData.append('panNumber', panNumber);
       formData.append('categories', JSON.stringify(selectedCategories));
       
-      if (newAvatar) {
-        formData.append('profilePicture', {
-          uri: newAvatar.uri,
-          type: 'image/jpeg',
-          name: 'profile_update.jpg'
-        } as any);
-      }
+      const appendFile = (field: string, file: any, defaultName: string) => {
+        if (file) {
+          formData.append(field, {
+            uri: file.uri,
+            type: 'image/jpeg',
+            name: defaultName
+          } as any);
+        }
+      };
+
+      appendFile('profilePicture', newAvatar, 'profile_update.jpg');
+      appendFile('aadhaarImage', newAadhaarImage, 'aadhaar_update.jpg');
+      appendFile('panImage', newPanImage, 'pan_update.jpg');
 
       await api.put('/workers/profile', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
@@ -125,6 +142,8 @@ export default function ProfileScreen() {
       Alert.alert('Success', 'Profile updated successfully.');
       fetchProfile();
       setNewAvatar(null);
+      setNewAadhaarImage(null);
+      setNewPanImage(null);
     } catch (err: any) {
       Alert.alert('Error', err.response?.data?.message || 'Failed to update profile.');
     } finally {
@@ -140,34 +159,37 @@ export default function ProfileScreen() {
      );
   }
 
+  const { needsPolice, needsCert } = getRequirements();
   const avatarSource = newAvatar ? { uri: newAvatar.uri } : profile?.profilePicture ? { uri: getImageUrl(profile.profilePicture) } : { uri: 'https://via.placeholder.com/150' };
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+      <StatusBar barStyle="dark-content" translucent={false} backgroundColor="#FFF" />
       
-      {/* Premium Stable Header - Absolute to fix overlap issues */}
-      <View style={[styles.header, { height: 120 + insets.top, paddingTop: insets.top }]}>
+      {/* Clean Premium Header */}
+      <View style={[styles.header, { paddingTop: insets.top }]}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <ArrowLeft size={24} color="#FFF" />
+          <ArrowLeft size={24} color="#1E1B4B" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Professional Profile</Text>
+        <Text style={styles.headerTitle}>Partner Profile</Text>
+        <View style={{ width: 44 }} />
       </View>
 
-      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingTop: 130 + insets.top }]} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         
-        {/* Profile Card Overlay - No negative margins for stability */}
+        {/* Profile Identity Card */}
         <View style={styles.profileMasterCard}>
             <View style={styles.avatarContainer}>
               <View style={styles.avatarWrapper}>
                 <Image source={avatarSource} style={styles.avatar} />
-                <TouchableOpacity style={styles.editAvatarBtn} onPress={handlePickAvatar}>
+                <TouchableOpacity style={styles.editAvatarBtn} onPress={() => handlePickImage('avatar')}>
                   <Camera size={16} color="#FFF" />
                 </TouchableOpacity>
               </View>
               <Text style={styles.workerName}>{profile?.name}</Text>
-              <View style={styles.statusBadgeRow}>
-                 <View style={[styles.statusIndicator, { backgroundColor: profile?.status === 'approved' ? '#10B981' : '#F59E0B' }]} />
+              
+              <View style={[styles.statusBadgeRow, { backgroundColor: profile?.status === 'approved' ? '#ECFDF5' : '#FFF7ED', borderColor: profile?.status === 'approved' ? '#10B981' : '#F59E0B' }]}>
+                 <ShieldCheck size={14} color={profile?.status === 'approved' ? '#10B981' : '#F59E0B'} style={{ marginRight: 6 }} />
                  <Text style={[styles.workerStatus, { color: profile?.status === 'approved' ? '#10B981' : '#F59E0B' }]}>
                     {profile?.status === 'approved' ? 'Verified Professional' : 'Verification Pending'}
                  </Text>
@@ -202,10 +224,10 @@ export default function ProfileScreen() {
           <View style={styles.sectionHeader}>
             <View style={styles.sectionTitleRow}>
                <Briefcase size={20} color="#4F46E5" />
-               <Text style={styles.sectionTitle}>My Services</Text>
+               <Text style={styles.sectionTitle}>My Expert Services</Text>
             </View>
             <TouchableOpacity onPress={() => setShowCategoryModal(true)}>
-               <Text style={styles.editLink}>Configure</Text>
+               <Text style={styles.editLink}>Update Skills</Text>
             </TouchableOpacity>
           </View>
           
@@ -217,73 +239,137 @@ export default function ProfileScreen() {
                  </View>
                ))
              ) : (
-               <Text style={styles.emptyText}>No services selected yet</Text>
+               <View style={styles.emptyPrompt}>
+                 <Briefcase size={20} color="#9CA3AF" style={{ marginBottom: 4 }} />
+                 <Text style={styles.emptyText}>No services selected yet</Text>
+               </View>
              )}
           </View>
+          {profile?.status !== 'approved' && (
+            <Text style={styles.infoNote}>Changing skills may require new document verification.</Text>
+          )}
         </View>
 
-        {/* Section: Documentation & Verification */}
+        {/* Section: Identity Verification */}
         <View style={styles.section}>
           <View style={styles.sectionTitleRow}>
-             <ShieldCheck size={20} color="#10B981" />
-             <Text style={styles.sectionTitle}>KYC & Documents</Text>
+             <ShieldCheck size={20} color="#4F46E5" />
+             <Text style={styles.sectionTitle}>Identity Verification</Text>
           </View>
           
-          <TouchableOpacity style={styles.docItem} activeOpacity={0.7}>
-             <View style={styles.docInfo}>
-                <View style={styles.docIconBox}>
-                   <FileText size={20} color="#4F46E5" />
-                </View>
-                <View>
-                   <Text style={styles.docName}>Aadhaar Verification</Text>
-                   <Text style={styles.docStatus}>ID: {profile?.aadhaarNumber ? `XXXX XXXX ${profile.aadhaarNumber.slice(-4)}` : 'Not Provided'}</Text>
-                </View>
-             </View>
-             {profile?.aadhaarNumber ? <Check size={20} color="#10B981" /> : <ChevronRight size={20} color="#9CA3AF" />}
-          </TouchableOpacity>
+          <View style={styles.inputGroup}>
+            <Text style={styles.miniLabel}>Aadhaar Number</Text>
+            <View style={styles.inputWrapper}>
+              <ShieldCheck size={18} color="#9CA3AF" style={styles.fieldIcon} />
+              <TextInput 
+                style={styles.input} 
+                value={aadhaarNumber} 
+                onChangeText={setAadhaarNumber}
+                placeholder="12-digit Aadhaar"
+                keyboardType="numeric"
+                maxLength={12}
+              />
+              {profile?.aadhaarNumber && <Check size={16} color="#10B981" />}
+            </View>
+            <TouchableOpacity style={styles.reuploadBtn} onPress={() => handlePickImage('aadhaar')}>
+               <Camera size={14} color="#4F46E5" />
+               <Text style={styles.reuploadText}>{profile?.aadhaarImage ? 'Update Aadhaar Photo' : 'Upload Aadhaar Photo'}</Text>
+               {(newAadhaarImage || profile?.aadhaarImage) && <Check size={14} color="#10B981" style={{ marginLeft: 6 }} />}
+            </TouchableOpacity>
+          </View>
 
-          <TouchableOpacity style={styles.docItem} activeOpacity={0.7}>
-             <View style={styles.docInfo}>
-                <View style={styles.docIconBox}>
-                   <FileText size={20} color="#4F46E5" />
-                </View>
-                <View>
-                   <Text style={styles.docName}>Police Verification</Text>
-                   <Text style={styles.docStatus}>{profile?.policeVerification ? 'Document Uploaded' : 'Action Required'}</Text>
-                </View>
-             </View>
-             {profile?.policeVerification ? <Check size={20} color="#10B981" /> : <ChevronRight size={20} color="#9CA3AF" />}
-          </TouchableOpacity>
+          <View style={styles.inputGroup}>
+            <Text style={styles.miniLabel}>PAN Card Number</Text>
+            <View style={styles.inputWrapper}>
+              <FileText size={18} color="#9CA3AF" style={styles.fieldIcon} />
+              <TextInput 
+                style={styles.input} 
+                value={panNumber} 
+                onChangeText={setPanNumber}
+                placeholder="Ex: ABCDE1234F"
+                autoCapitalize="characters"
+                maxLength={10}
+              />
+              {profile?.panNumber && <Check size={16} color="#10B981" />}
+            </View>
+            <TouchableOpacity style={styles.reuploadBtn} onPress={() => handlePickImage('pan')}>
+               <Camera size={14} color="#4F46E5" />
+               <Text style={styles.reuploadText}>{profile?.panImage ? 'Update PAN Photo' : 'Upload PAN Photo'}</Text>
+               {(newPanImage || profile?.panImage) && <Check size={14} color="#10B981" style={{ marginLeft: 6 }} />}
+            </TouchableOpacity>
+          </View>
         </View>
+
+        {/* Section: Service-Based Documents (DYNAMIC) */}
+        {(needsPolice || needsCert) && (
+          <View style={styles.section}>
+             <View style={styles.sectionTitleRow}>
+                <ShieldCheck size={20} color="#F59E0B" />
+                <Text style={styles.sectionTitle}>Expert Requirements</Text>
+             </View>
+             
+             {needsPolice && (
+                <View style={[styles.inputGroup, { borderTopWidth: 1, borderTopColor: '#F3F4F6', paddingTop: 16 }]}>
+                   <Text style={[styles.miniLabel, { color: '#D97706' }]}>Police Verification</Text>
+                   <Text style={styles.docDesc}>Required for Care/Cooking services to ensure customer safety.</Text>
+                   <TouchableOpacity style={styles.reuploadBtn} onPress={() => handlePickImage('police')}>
+                      <Camera size={14} color="#4F46E5" />
+                      <Text style={styles.reuploadText}>{profile?.policeVerification ? 'Update Certificate' : 'Upload Certificate'}</Text>
+                      {profile?.policeVerification && <Check size={14} color="#10B981" style={{ marginLeft: 6 }} />}
+                   </TouchableOpacity>
+                </View>
+             )}
+
+             {needsCert && (
+                <View style={[styles.inputGroup, { borderTopWidth: 1, borderTopColor: '#F3F4F6', paddingTop: 16 }]}>
+                   <Text style={[styles.miniLabel, { color: '#4F46E5' }]}>Trade Certification</Text>
+                   <Text style={styles.docDesc}>Required for verified professional skilled trades.</Text>
+                   <TouchableOpacity style={styles.reuploadBtn} onPress={() => handlePickImage('cert')}>
+                      <Camera size={14} color="#4F46E5" />
+                      <Text style={styles.reuploadText}>{profile?.certification ? 'Update Trade ID' : 'Upload Trade ID'}</Text>
+                      {profile?.certification && <Check size={14} color="#10B981" style={{ marginLeft: 6 }} />}
+                   </TouchableOpacity>
+                </View>
+             )}
+          </View>
+        )}
 
         {/* Section: Contact Details (Restricted Edit) */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Contact Information</Text>
+          <View style={styles.sectionTitleRow}>
+             <Phone size={20} color="#4F46E5" />
+             <Text style={styles.sectionTitle}>Account Information</Text>
+          </View>
 
           <View style={styles.inputGroup}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                <Text style={styles.inputLabel}>Registered Mobile</Text>
-               <View style={styles.lockedRow}>
-                  <ShieldCheck size={12} color="#9CA3AF" />
-                  <Text style={styles.lockedText}>Verified</Text>
+               <View style={styles.lockedBadge}>
+                  <ShieldCheck size={10} color="#FFF" />
+                  <Text style={styles.lockedBadgeText}>VERIFIED</Text>
                </View>
             </View>
-            <View style={[styles.inputWrapper, { backgroundColor: '#F3F4F6' }]}>
+            <View style={[styles.inputWrapper, { backgroundColor: '#F9FAFB', borderColor: '#E5E7EB' }]}>
               <Phone size={18} color="#9CA3AF" style={styles.fieldIcon} />
               <TextInput 
                 style={[styles.input, { color: '#6B7280' }]} 
                 value={phone} 
                 editable={false}
               />
+              <LockIcon size={16} color="#9CA3AF" />
             </View>
             <Text style={styles.adminNote}>Contact Admin to change registered mobile number.</Text>
           </View>
           
-          <TouchableOpacity style={styles.saveButton} onPress={handleSave} disabled={saving}>
+          <TouchableOpacity 
+            style={[styles.saveButton, saving && { opacity: 0.7 }]} 
+            onPress={handleSave} 
+            disabled={saving}
+          >
              {saving ? <ActivityIndicator color="#FFF" /> : (
                <>
                  <Check size={20} color="#FFF" style={{ marginRight: 8 }} />
-                 <Text style={styles.buttonText}>Update Profile Settings</Text>
+                 <Text style={styles.buttonText}>Save Changes</Text>
                </>
              )}
           </TouchableOpacity>
@@ -296,8 +382,9 @@ export default function ProfileScreen() {
       <Modal visible={showCategoryModal} animationType="slide" transparent={true}>
          <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
+               <View style={styles.modalHandle} />
                <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>Select Services</Text>
+                  <Text style={styles.modalTitle}>Update Expert Skills</Text>
                   <TouchableOpacity onPress={() => setShowCategoryModal(false)}>
                      <X size={24} color="#374151" />
                   </TouchableOpacity>
@@ -312,7 +399,7 @@ export default function ProfileScreen() {
                           style={[styles.categoryCard, selectedCategories.includes(cat._id) && styles.categoryCardSelected]}
                           onPress={() => toggleCategory(cat._id)}
                         >
-                           <Text style={styles.categoryIcon}>{cat.icon || '🛠️'}</Text>
+                           <Text style={styles.categoryIcon}>{EMOJI_MAP[cat.icon] || cat.icon || '🛠️'}</Text>
                            <Text style={[styles.categoryName, selectedCategories.includes(cat._id) && styles.categoryNameSelected]}>{cat.name}</Text>
                            {selectedCategories.includes(cat._id) && (
                               <View style={styles.selectedCheck}>
@@ -325,7 +412,7 @@ export default function ProfileScreen() {
                </ScrollView>
 
                <TouchableOpacity style={styles.modalApplyBtn} onPress={() => setShowCategoryModal(false)}>
-                  <Text style={styles.modalApplyText}>Confirm Selections</Text>
+                  <Text style={styles.modalApplyText}>Update My Skills</Text>
                </TouchableOpacity>
             </View>
          </View>
@@ -334,85 +421,88 @@ export default function ProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F3F4F6' },
-  header: { 
-    position: 'absolute', 
-    top: 0, 
-    left: 0, 
-    right: 0, 
-    zIndex: 100, 
-    backgroundColor: '#1E1B4B', 
-    paddingHorizontal: 20, 
-    justifyContent: 'center',
-    alignItems: 'center', 
-    borderBottomLeftRadius: 32, 
-    borderBottomRightRadius: 32 
-  },
-  backBtn: { position: 'absolute', left: 20, width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center' },
-  headerTitle: { color: '#FFF', fontSize: 18, fontWeight: '900', letterSpacing: 0.5 },
-  
-  scrollContent: { paddingBottom: 40 },
-  
-  profileMasterCard: { backgroundColor: '#FFF', marginHorizontal: 20, borderRadius: 28, padding: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.1, shadowRadius: 20, elevation: 5 },
-  avatarContainer: { alignItems: 'center', marginBottom: 20 },
-  avatarWrapper: { position: 'relative', width: 100, height: 100, borderRadius: 50, padding: 3, backgroundColor: '#FFF', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 4 },
-  avatar: { width: '100%', height: '100%', borderRadius: 50, backgroundColor: '#E5E7EB' },
-  editAvatarBtn: { position: 'absolute', bottom: 0, right: 0, backgroundColor: '#4F46E5', width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#FFF' },
-  workerName: { fontSize: 22, fontWeight: '900', color: '#111827', marginTop: 12 },
-  statusBadgeRow: { flexDirection: 'row', alignItems: 'center', marginTop: 6, backgroundColor: '#F9FAFB', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
-  statusIndicator: { width: 6, height: 6, borderRadius: 3, marginRight: 8 },
-  workerStatus: { fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
+const LockIcon = (props: any) => (
+   <View style={{ width: props.size, height: props.size, alignItems: 'center', justifyContent: 'center' }}>
+      <Text style={{ fontSize: props.size, color: props.color }}>🔒</Text>
+   </View>
+);
 
-  statsDivider: { height: 1, backgroundColor: '#F3F4F6', marginVertical: 16 },
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#F9FAFB' },
+  header: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'space-between', 
+    height: 60, 
+    backgroundColor: '#FFF', 
+    paddingHorizontal: 20, 
+    borderBottomWidth: 1, 
+    borderBottomColor: '#F3F4F6' 
+  },
+  backBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#F3F4F6', justifyContent: 'center', alignItems: 'center' },
+  headerTitle: { color: '#1E1B4B', fontSize: 18, fontWeight: '900', letterSpacing: 0.5 },
+  
+  scrollContent: { paddingBottom: 40, paddingTop: 20 },
+  
+  profileMasterCard: { backgroundColor: '#FFF', marginHorizontal: 20, borderRadius: 28, padding: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.05, shadowRadius: 20, elevation: 5 },
+  avatarContainer: { alignItems: 'center', marginBottom: 20 },
+  avatarWrapper: { position: 'relative', width: 110, height: 110, borderRadius: 55, padding: 4, backgroundColor: '#FFF', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 4 },
+  avatar: { width: '100%', height: '100%', borderRadius: 55, backgroundColor: '#F3F4F6' },
+  editAvatarBtn: { position: 'absolute', bottom: 4, right: 4, backgroundColor: '#4F46E5', width: 34, height: 34, borderRadius: 17, justifyContent: 'center', alignItems: 'center', borderWidth: 3, borderColor: '#FFF' },
+  workerName: { fontSize: 24, fontWeight: '900', color: '#111827', marginTop: 16 },
+  statusBadgeRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, borderWidth: 1 },
+  workerStatus: { fontSize: 11, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1 },
+
+  statsDivider: { height: 1, backgroundColor: '#F9FAFB', marginVertical: 20 },
   statsRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   statBox: { flex: 1, alignItems: 'center' },
-  verticalDivider: { width: 1, height: 30, backgroundColor: '#E5E7EB' },
-  statValue: { fontSize: 18, fontWeight: '900', color: '#111827' },
-  statLabel: { fontSize: 10, color: '#9CA3AF', fontWeight: '700', marginTop: 2, textTransform: 'uppercase' },
+  verticalDivider: { width: 1, height: 24, backgroundColor: '#F3F4F6' },
+  statValue: { fontSize: 20, fontWeight: '900', color: '#111827' },
+  statLabel: { fontSize: 10, color: '#9CA3AF', fontWeight: '800', marginTop: 4, textTransform: 'uppercase', letterSpacing: 0.5 },
 
-  section: { backgroundColor: '#FFF', borderRadius: 24, padding: 20, marginHorizontal: 20, marginTop: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
-  sectionTitle: { fontSize: 16, fontWeight: '900', color: '#111827', marginLeft: 10 },
-  editLink: { fontSize: 13, fontWeight: '800', color: '#4F46E5' },
+  section: { backgroundColor: '#FFF', borderRadius: 28, padding: 24, marginHorizontal: 20, marginTop: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.03, shadowRadius: 10, elevation: 2 },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
+  sectionTitle: { fontSize: 17, fontWeight: '900', color: '#111827', marginLeft: 12 },
+  editLink: { fontSize: 13, fontWeight: '900', color: '#4F46E5', backgroundColor: '#F5F3FF', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10 },
   
   categoriesShelf: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  skillTag: { backgroundColor: '#EEF2FF', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, borderWidth: 1, borderColor: '#E0E7FF' },
-  skillTagText: { fontSize: 13, fontWeight: '700', color: '#4338CA' },
-  emptyText: { fontSize: 14, color: '#9CA3AF', fontStyle: 'italic' },
+  skillTag: { backgroundColor: '#F5F3FF', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 14, borderWidth: 1.5, borderColor: '#EDE9FE' },
+  skillTagText: { fontSize: 13, fontWeight: '800', color: '#4F46E5' },
+  emptyPrompt: { width: '100%', alignItems: 'center', padding: 20, backgroundColor: '#F9FAFB', borderRadius: 20, borderStyle: 'dashed', borderWidth: 2, borderColor: '#E5E7EB' },
+  emptyText: { fontSize: 13, color: '#9CA3AF', fontWeight: '600' },
+  infoNote: { fontSize: 11, color: '#6B7280', marginTop: 16, fontStyle: 'italic' },
 
-  docItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#F9FAFB', padding: 12, borderRadius: 16, marginBottom: 10 },
-  docInfo: { flexDirection: 'row', alignItems: 'center' },
-  docIconBox: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#EEF2FF', justifyContent: 'center', alignItems: 'center', marginRight: 12 },
-  docName: { fontSize: 14, fontWeight: '700', color: '#111827' },
-  docStatus: { fontSize: 12, color: '#6B7280', marginTop: 2 },
-
-  inputGroup: { marginBottom: 20 },
-  inputLabel: { fontSize: 12, fontWeight: '800', color: '#374151', textTransform: 'uppercase', marginBottom: 0, marginLeft: 4 },
-  lockedRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  lockedText: { fontSize: 11, fontWeight: '700', color: '#9CA3AF' },
-  inputWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F9FAFB', borderRadius: 16, paddingHorizontal: 16, height: 56, borderWidth: 1, borderColor: '#E5E7EB' },
+  inputGroup: { marginBottom: 24 },
+  miniLabel: { fontSize: 11, fontWeight: '900', color: '#6B7280', textTransform: 'uppercase', marginBottom: 8, marginLeft: 4, letterSpacing: 0.5 },
+  inputLabel: { fontSize: 13, fontWeight: '900', color: '#374151', textTransform: 'uppercase', letterSpacing: 0.5, marginLeft: 4 },
+  docDesc: { fontSize: 12, color: '#6B7280', marginBottom: 12, marginLeft: 4, lineHeight: 18 },
+  lockedBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#6B7280', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, gap: 4 },
+  lockedBadgeText: { color: '#FFF', fontSize: 9, fontWeight: '900' },
+  inputWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F9FAFB', borderRadius: 18, paddingHorizontal: 16, height: 60, borderWidth: 1.5, borderColor: '#F3F4F6' },
   fieldIcon: { marginRight: 12 },
   input: { flex: 1, fontSize: 16, fontWeight: '700', color: '#111827' },
-  adminNote: { fontSize: 11, color: '#9CA3AF', marginTop: 8, marginLeft: 4, fontStyle: 'italic' },
+  reuploadBtn: { flexDirection: 'row', alignItems: 'center', marginTop: 12, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: '#F5F3FF', borderRadius: 12, alignSelf: 'flex-start' },
+  reuploadText: { fontSize: 12, color: '#4338CA', fontWeight: '800', marginLeft: 8 },
+  adminNote: { fontSize: 11, color: '#9CA3AF', marginTop: 10, marginLeft: 4, fontWeight: '600', fontStyle: 'italic' },
   
-  saveButton: { backgroundColor: '#4F46E5', borderRadius: 16, height: 56, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', shadowColor: '#4F46E5', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 },
-  buttonText: { color: '#FFF', fontSize: 16, fontWeight: '800' },
+  saveButton: { backgroundColor: '#4F46E5', borderRadius: 20, height: 64, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 10, shadowColor: '#4F46E5', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 8 },
+  buttonText: { color: '#FFF', fontSize: 17, fontWeight: '900' },
 
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: '#FFF', borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 24, maxHeight: '80%' },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  modalTitle: { fontSize: 20, fontWeight: '900', color: '#111827' },
-  modalSub: { fontSize: 14, color: '#6B7280', marginBottom: 20, lineHeight: 20 },
-  categoryGrid: { marginBottom: 20 },
-  categoryGridInner: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  categoryCard: { width: '31%', backgroundColor: '#F9FAFB', borderRadius: 16, padding: 12, alignItems: 'center', borderWidth: 2, borderColor: '#F3F4F6' },
-  categoryCardSelected: { borderColor: '#4F46E5', backgroundColor: '#EEF2FF' },
-  categoryIcon: { fontSize: 24, marginBottom: 8 },
-  categoryName: { fontSize: 12, fontWeight: '700', color: '#4B5563', textAlign: 'center' },
-  categoryNameSelected: { color: '#4338CA' },
-  selectedCheck: { position: 'absolute', top: 4, right: 4, backgroundColor: '#4F46E5', width: 20, height: 20, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
-  modalApplyBtn: { backgroundColor: '#4F46E5', height: 56, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
-  modalApplyText: { color: '#FFF', fontSize: 16, fontWeight: '900' }
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.7)', justifyContent: 'flex-end' },
+  modalContent: { backgroundColor: '#FFF', borderTopLeftRadius: 40, borderTopRightRadius: 40, padding: 32, maxHeight: '85%' },
+  modalHandle: { width: 40, height: 6, backgroundColor: '#E5E7EB', borderRadius: 3, alignSelf: 'center', marginBottom: 24 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  modalTitle: { fontSize: 24, fontWeight: '900', color: '#111827' },
+  modalSub: { fontSize: 14, color: '#6B7280', marginBottom: 28, lineHeight: 22, fontWeight: '500' },
+  categoryGrid: { marginBottom: 24 },
+  categoryGridInner: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
+  categoryCard: { width: '30%', backgroundColor: '#F9FAFB', borderRadius: 24, padding: 16, alignItems: 'center', borderWidth: 2, borderColor: '#F3F4F6' },
+  categoryCardSelected: { borderColor: '#4F46E5', backgroundColor: '#F5F3FF' },
+  categoryIcon: { fontSize: 28, marginBottom: 10 },
+  categoryName: { fontSize: 12, fontWeight: '800', color: '#4B5563', textAlign: 'center', lineHeight: 16 },
+  categoryNameSelected: { color: '#4F46E5' },
+  selectedCheck: { position: 'absolute', top: 8, right: 8, backgroundColor: '#4F46E5', width: 22, height: 22, borderRadius: 11, justifyContent: 'center', alignItems: 'center' },
+  modalApplyBtn: { backgroundColor: '#4F46E5', height: 64, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
+  modalApplyText: { color: '#FFF', fontSize: 18, fontWeight: '900' }
 });

@@ -11,7 +11,7 @@ const seedWorkers = async () => {
   await Worker.create([
     {
       name: 'Ramesh Kumar',
-      phoneNumber: '9876543210',
+      phoneNumber: '9999999999',
       password: 'Ramesh',
       location: { type: 'Point', coordinates: [77.5946, 12.9716] },
       pincodes: ['700156', '700091'],

@@ -19,7 +19,7 @@ class WorkerRepository {
   }
 
   async findById(id) {
-    return await Worker.findById(id).select('-password');
+    return await Worker.findById(id).select('-password').populate('categories');
   }
 
   async updateLocation(id, coordinates) {

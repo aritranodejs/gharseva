@@ -21,6 +21,23 @@ const User = UserIcon as any;
 const Help = HelpIcon as any;
 import PremiumToast, { ToastType } from '../components/PremiumToast';
 
+const EMOJI_MAP: Record<string, string> = {
+  'sparkles': '🧺',
+  'wrench': '🔧',
+  'bolt': '⚡',
+  'Zap': '⚡',
+  'User': '👤',
+  'Check': '✅',
+  'droplet': '🚰',
+  'paint-roller': '🎨',
+  'wind': '❄️',
+  'tv': '📺',
+  'bug': '🦟',
+  'utensils': '🍳',
+  'heart': '💓',
+  'house': '🏠'
+};
+
 interface BookingRequest {
   bookingId: string;
   pincode: string;
@@ -436,7 +453,7 @@ export default function DashboardScreen({ onLogout }: { onLogin?: () => void, on
             <View key={job._id} style={[styles.jobCard, job.subscriptionId && styles.premiumCard]}>
               <View style={styles.jobHeader}>
                 <View style={styles.serviceBox}>
-                   <Text style={{ fontSize: 24 }}>{job.serviceId?.icon || '🛠️'}</Text>
+                   <Text style={{ fontSize: 24 }}>{EMOJI_MAP[job.serviceId?.icon || ''] || job.serviceId?.icon || '🛠️'}</Text>
                    <View style={{ marginLeft: 12 }}>
                       <Text style={styles.jobService}>{job.serviceId?.name || 'Service'}</Text>
                       {job.subscriptionId && (
@@ -509,7 +526,7 @@ export default function DashboardScreen({ onLogout }: { onLogin?: () => void, on
               <View key={job._id} style={[styles.jobCard, job.status === 'cancelled' && { opacity: 0.6 }]}>
                 <View style={styles.jobHeader}>
                   <View style={styles.serviceBox}>
-                     <Text style={{ fontSize: 24 }}>{job.serviceId?.icon || '🛠️'}</Text>
+                     <Text style={{ fontSize: 24 }}>{EMOJI_MAP[job.serviceId?.icon || ''] || job.serviceId?.icon || '🛠️'}</Text>
                      <View style={{ marginLeft: 12 }}>
                         <Text style={styles.jobService}>{job.serviceId?.name || 'Service'}</Text>
                         <Text style={{ fontSize: 13, color: '#9CA3AF', marginTop: 2 }}>{new Date(job.schedule).toLocaleDateString()}</Text>

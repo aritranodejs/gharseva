@@ -73,6 +73,13 @@ class WorkerService {
        worker.skills = typeof updates.skills === 'string' ? JSON.parse(updates.skills) : updates.skills;
     }
 
+    if (updates.aadhaarNumber) worker.aadhaarNumber = updates.aadhaarNumber;
+    if (updates.panNumber) worker.panNumber = updates.panNumber;
+    if (updates.aadhaarImage) worker.aadhaarImage = updates.aadhaarImage;
+    if (updates.panImage) worker.panImage = updates.panImage;
+    if (updates.policeVerification) worker.policeVerification = updates.policeVerification;
+    if (updates.certification) worker.certification = updates.certification;
+
     await worker.save();
     return worker;
   }
