@@ -1,0 +1,378 @@
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Image, Dimensions, StatusBar, Alert, Linking, Modal, TextInput } from 'react-native';
+import { ChevronLeft, Calendar, Clock, MapPin, Phone, Star, CheckCircle2, Clock3, AlertCircle, ShoppingBag, ShieldCheck } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { io, Socket } from 'socket.io-client';
+import api, { getImageUrl } from '../services/api';
+import PremiumToast from '../components/PremiumToast';
+
+const { width } = Dimensions.get('window');
+
+export default function BookingDetailScreen({ route, navigation }: any) {
+  const { bookingId } = route.params;
+  const insets = useSafeAreaInsets();
+  const [booking, setBooking] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [cancelModalVisible, setCancelModalVisible] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelling, setCancelling] = useState(false);
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastType, setToastType] = useState<'success' | 'error' | 'info'>('info');
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setToastMessage(message);
+    setToastType(type);
+    setToastVisible(true);
+  };
+
+  useEffect(() => {
+    let socket: Socket;
+    const initSocket = async () => {
+      try {
+        const userData = await AsyncStorage.getItem('userData');
+        if (userData) {
+           const { _id } = JSON.parse(userData);
+           const socketUrl = api.defaults.baseURL?.toString().replace('/api', '') || 'http://192.168.1.5:5000';
+           socket = io(socketUrl);
+           socket.emit('register_user', _id);
+           socket.on('booking_status_update', (data) => {
+              if (data.bookingId === bookingId) {
+                 fetchBookingDetails();
+              }
+           });
+        }
+      } catch (e) {}
+    };
+
+    initSocket();
+    fetchBookingDetails();
+    return () => {
+      if (socket) socket.disconnect();
+    }
+  }, []);
+
+  const fetchBookingDetails = async () => {
+    try {
+      const response = await api.get(`bookings/${bookingId}`);
+      setBooking(response.data.data);
+    } catch (err) {
+      console.error('Error fetching booking details:', err);
+      showToast('Failed to load booking details', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCall = () => {
+    const phoneNumber = booking.assignedWorkerId?.phoneNumber;
+    if (phoneNumber) {
+      Linking.openURL(`tel:${phoneNumber}`);
+    } else {
+      showToast('Phone number not available', 'error');
+    }
+  };
+
+  const handleCancel = async () => {
+    if (!cancelReason.trim()) {
+      showToast('Please provide a reason for cancellation', 'error');
+      return;
+    }
+
+    setCancelling(true);
+    try {
+      await api.patch(`bookings/${bookingId}/cancel`, { reason: cancelReason });
+      showToast('Your booking has been cancelled successfully', 'success');
+      setCancelModalVisible(false);
+      fetchBookingDetails(); // Refresh
+    } catch (err: any) {
+      console.error('Error cancelling booking:', err);
+      showToast(err.response?.data?.message || 'Failed to cancel booking', 'error');
+    } finally {
+      setCancelling(false);
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'completed': return '#10B981';
+      case 'confirmed': return '#4F46E5';
+      case 'searching_worker': return '#6366F1';
+      case 'pending': return '#9CA3AF';
+      case 'cancelled': return '#EF4444';
+      default: return '#6B7280';
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color="#4F46E5" />
+      </View>
+    );
+  }
+
+  if (!booking) return null;
+
+  return (
+    <View style={styles.container}>
+      <StatusBar barStyle="dark-content" />
+      
+      {/* Custom Header */}
+      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <ChevronLeft size={24} color="#111827" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Booking Details</Text>
+        <View style={{ width: 40 }} />
+      </View>
+
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        {/* Status Section */}
+        <View style={styles.statusSection}>
+           <View style={[styles.statusIconWrapper, { backgroundColor: getStatusColor(booking.status) + '15' }]}>
+              {booking.status === 'completed' ? <CheckCircle2 size={32} color="#10B981" /> : <Clock3 size={32} color="#4F46E5" />}
+           </View>
+           <Text style={[styles.statusLabel, { color: getStatusColor(booking.status) }]}>{booking.status.replace('_', ' ').toUpperCase()}</Text>
+           <Text style={styles.bookingId}>Order ID: #{booking._id.slice(-8).toUpperCase()}</Text>
+        </View>
+
+        {/* Service Summary */}
+        <View style={styles.section}>
+          <View style={styles.serviceRow}>
+            <View style={styles.serviceIcon}>
+              <Text style={{ fontSize: 32 }}>{booking.serviceId?.icon || '🛠️'}</Text>
+            </View>
+            <View style={styles.serviceText}>
+              <Text style={styles.serviceName}>{booking.serviceId?.name || 'Home Service'}</Text>
+              <Text style={styles.serviceSub}>Standard Professional Service</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Schedule & Location */}
+        <View style={styles.section}>
+           <Text style={styles.sectionTitle}>Service Schedule</Text>
+           <View style={styles.infoCard}>
+              <View style={styles.infoRow}>
+                 <Calendar size={18} color="#4F46E5" />
+                 <Text style={styles.infoText}>{new Date(booking.schedule).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</Text>
+              </View>
+              <View style={[styles.infoRow, { marginTop: 12 }]}>
+                 <Clock size={18} color="#4F46E5" />
+                 <Text style={styles.infoText}>{new Date(booking.schedule).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
+              </View>
+              <View style={styles.divider} />
+              <View style={styles.infoRow}>
+                 <MapPin size={18} color="#6B7280" />
+                 <Text style={styles.addressText}>{booking.address}</Text>
+              </View>
+           </View>
+        </View>
+
+        {/* Worker Section */}
+        {booking.assignedWorkerId ? (
+          <View style={styles.section}>
+             <Text style={styles.sectionTitle}>Assigned Professional</Text>
+             <View style={styles.workerCard}>
+                <View style={styles.workerInfo}>
+                   <Image 
+                     source={{ uri: getImageUrl(booking.assignedWorkerId.profilePicture) || 'https://via.placeholder.com/100' }} 
+                     style={styles.workerAvatar} 
+                   />
+                   <View style={styles.workerNameBox}>
+                      <Text style={styles.workerName}>{booking.assignedWorkerId.name}</Text>
+                      <View style={styles.ratingRow}>
+                         <Star size={12} color="#F59E0B" fill="#F59E0B" />
+                         <Text style={styles.ratingText}>{booking.assignedWorkerId.rating || '4.8'} (Expert)</Text>
+                      </View>
+                   </View>
+                </View>
+                { !['completed', 'cancelled'].includes(booking.status) && (
+                  <TouchableOpacity style={styles.callBtn} onPress={handleCall}>
+                     <Phone size={20} color="#FFFFFF" />
+                  </TouchableOpacity>
+                )}
+              </View>
+           </View>
+        ) : booking.status === 'cancelled' ? (
+          <View style={[styles.searchingBox, { borderColor: '#FECACA', backgroundColor: '#FEF2F2' }]}>
+             <AlertCircle color="#EF4444" size={28} style={{ marginBottom: 12 }} />
+             <Text style={[styles.searchingText, { color: '#EF4444' }]}>This booking has been cancelled.</Text>
+          </View>
+        ) : (
+          <View style={styles.searchingBox}>
+             <ActivityIndicator color="#4F46E5" style={{ marginBottom: 12 }} />
+             <Text style={styles.searchingText}>Finding the best professional near you...</Text>
+          </View>
+        )}
+
+        {/* Cancellation Section */}
+        {booking.status !== 'cancelled' && booking.status !== 'completed' && (
+           <View style={styles.section}>
+              <TouchableOpacity 
+                style={styles.cancelOrderBtn} 
+                onPress={() => setCancelModalVisible(true)}
+              >
+                 <AlertCircle size={18} color="#EF4444" />
+                 <Text style={styles.cancelOrderText}>Cancel This Booking</Text>
+              </TouchableOpacity>
+           </View>
+        )}
+
+        {/* Completion PIN Section */}
+        {['confirmed', 'in_progress'].includes(booking.status) && booking.completionOtp && (
+          <View style={styles.section}>
+            <View style={styles.otpCard}>
+              <View style={styles.otpHeader}>
+                <ShieldCheck size={20} color="#10B981" />
+                <Text style={styles.otpTitle}>Completion PIN</Text>
+              </View>
+              <Text style={styles.otpValue}>{booking.completionOtp}</Text>
+              <Text style={styles.otpDesc}>Share this secure 4-digit PIN with your professional only when the service is fully completed.</Text>
+            </View>
+          </View>
+        )}
+
+        {/* Payment Summary */}
+        <View style={styles.section}>
+           <Text style={styles.sectionTitle}>Payment Summary</Text>
+           <View style={styles.priceCard}>
+              <View style={styles.priceRow}>
+                 <Text style={styles.priceLabel}>Service Fee</Text>
+                 <Text style={styles.priceValue}>₹{booking.price}</Text>
+              </View>
+              <View style={styles.priceRow}>
+                 <Text style={styles.priceLabel}>Platform Fee</Text>
+                 <Text style={styles.priceValue}>₹{booking.platformFee || Math.max(29, Math.round(booking.price * 0.1))}</Text>
+              </View>
+              <View style={styles.divider} />
+              <View style={styles.priceRow}>
+                 <Text style={styles.totalLabel}>Total Payable</Text>
+                 <Text style={styles.totalValue}>₹{booking.price + (booking.platformFee || Math.max(29, Math.round(booking.price * 0.1)))}</Text>
+              </View>
+           </View>
+        </View>
+
+        <View style={styles.trustFooter}>
+           <ShieldCheck size={16} color="#10B981" />
+           <Text style={styles.trustFooterText}>Service backed by GharSeva Guarantee</Text>
+        </View>
+
+        <View style={{ height: 100 }} />
+      </ScrollView>
+
+      {/* Cancellation Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={cancelModalVisible}
+        onRequestClose={() => setCancelModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+           <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Cancel Booking?</Text>
+              <Text style={styles.modalSub}>Please tell us why you want to cancel. This helps us improve our service.</Text>
+              
+              <TextInput
+                style={styles.reasonInput}
+                placeholder="Reason for cancellation (e.g., booked by mistake, decided not to go ahead)"
+                multiline
+                numberOfLines={4}
+                value={cancelReason}
+                onChangeText={setCancelReason}
+              />
+
+              <View style={styles.modalActions}>
+                 <TouchableOpacity 
+                   style={styles.modalCancelBtn} 
+                   onPress={() => setCancelModalVisible(false)}
+                 >
+                    <Text style={styles.modalCancelText}>Don't Cancel</Text>
+                 </TouchableOpacity>
+                 <TouchableOpacity 
+                   style={[styles.modalConfirmBtn, { opacity: cancelling ? 0.7 : 1 }]} 
+                   onPress={handleCancel}
+                   disabled={cancelling}
+                 >
+                    {cancelling ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <Text style={styles.modalConfirmText}>Confirm Cancellation</Text>
+                    )}
+                 </TouchableOpacity>
+              </View>
+           </View>
+        </View>
+      </Modal>
+
+      <PremiumToast 
+        visible={toastVisible} 
+        message={toastMessage} 
+        type={toastType} 
+        onHide={() => setToastVisible(false)} 
+      />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#F9FAFB' },
+  centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, backgroundColor: '#FFFFFF', paddingBottom: 16 },
+  headerTitle: { fontSize: 18, fontWeight: '800', color: '#111827' },
+  backBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#F3F4F6', justifyContent: 'center', alignItems: 'center' },
+  scrollContent: { padding: 20 },
+  statusSection: { alignItems: 'center', marginBottom: 32 },
+  statusIconWrapper: { width: 72, height: 72, borderRadius: 36, justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
+  statusLabel: { fontSize: 18, fontWeight: '900', letterSpacing: 1 },
+  bookingId: { fontSize: 13, color: '#9CA3AF', marginTop: 4, fontWeight: '600' },
+  section: { marginBottom: 24 },
+  sectionTitle: { fontSize: 16, fontWeight: '900', color: '#111827', marginBottom: 12, marginLeft: 4 },
+  serviceRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', padding: 20, borderRadius: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 },
+  serviceIcon: { width: 64, height: 64, borderRadius: 16, backgroundColor: '#F3F4F6', justifyContent: 'center', alignItems: 'center' },
+  serviceText: { marginLeft: 16 },
+  serviceName: { fontSize: 20, fontWeight: '900', color: '#111827' },
+  serviceSub: { fontSize: 13, color: '#9CA3AF', marginTop: 2, fontWeight: '500' },
+  infoCard: { backgroundColor: '#FFFFFF', borderRadius: 24, padding: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 },
+  infoRow: { flexDirection: 'row', alignItems: 'center' },
+  infoText: { fontSize: 15, fontWeight: '700', color: '#374151', marginLeft: 12 },
+  divider: { height: 1, backgroundColor: '#F3F4F6', marginVertical: 16 },
+  addressText: { fontSize: 14, color: '#6B7280', marginLeft: 12, flex: 1, lineHeight: 20 },
+  workerCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#FFFFFF', padding: 16, borderRadius: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 },
+  workerInfo: { flexDirection: 'row', alignItems: 'center' },
+  workerAvatar: { width: 56, height: 56, borderRadius: 28 },
+  workerNameBox: { marginLeft: 16 },
+  workerName: { fontSize: 16, fontWeight: '800', color: '#111827' },
+  ratingRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
+  ratingText: { fontSize: 13, color: '#F59E0B', fontWeight: 'bold', marginLeft: 4 },
+  callBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#10B981', justifyContent: 'center', alignItems: 'center' },
+  searchingBox: { padding: 32, alignItems: 'center', backgroundColor: '#EEF2FF', borderRadius: 24, borderStyle: 'dashed', borderWidth: 2, borderColor: '#C7D2FE' },
+  searchingText: { fontSize: 14, color: '#4F46E5', fontWeight: '700', textAlign: 'center' },
+  priceCard: { backgroundColor: '#FFFFFF', borderRadius: 24, padding: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 },
+  priceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginVertical: 4 },
+  priceLabel: { fontSize: 14, color: '#6B7280', fontWeight: '500' },
+  priceValue: { fontSize: 14, color: '#111827', fontWeight: '700' },
+  totalLabel: { fontSize: 16, fontWeight: '900', color: '#111827' },
+  totalValue: { fontSize: 20, fontWeight: '900', color: '#4F46E5' },
+  otpCard: { backgroundColor: '#ECFDF5', borderRadius: 24, padding: 24, alignItems: 'center', shadowColor: '#10B981', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 3, borderWidth: 1, borderColor: '#A7F3D0' },
+  otpHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  otpTitle: { fontSize: 16, fontWeight: '800', color: '#065F46', marginLeft: 8 },
+  otpValue: { fontSize: 40, fontWeight: '900', color: '#059669', letterSpacing: 8, marginBottom: 8 },
+  otpDesc: { fontSize: 13, color: '#047857', textAlign: 'center', lineHeight: 20, fontWeight: '500' },
+  trustFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 16, opacity: 0.6 },
+  trustFooterText: { fontSize: 12, color: '#10B981', fontWeight: '700', marginLeft: 6 },
+  cancelOrderBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 16, borderRadius: 16, borderWidth: 1, borderColor: '#FEE2E2', backgroundColor: '#FEF2F2' },
+  cancelOrderText: { fontSize: 15, fontWeight: '800', color: '#EF4444', marginLeft: 8 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalContent: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 24, paddingBottom: 40 },
+  modalTitle: { fontSize: 22, fontWeight: '900', color: '#111827', marginBottom: 8 },
+  modalSub: { fontSize: 14, color: '#6B7280', marginBottom: 20, lineHeight: 20 },
+  reasonInput: { backgroundColor: '#F3F4F6', borderRadius: 16, padding: 16, height: 100, fontSize: 15, textAlignVertical: 'top', color: '#111827', marginBottom: 24 },
+  modalActions: { flexDirection: 'row', gap: 12 },
+  modalCancelBtn: { flex: 1, padding: 16, alignItems: 'center', borderRadius: 16, backgroundColor: '#F3F4F6' },
+  modalCancelText: { fontSize: 15, fontWeight: '700', color: '#4B5563' },
+  modalConfirmBtn: { flex: 2, padding: 16, alignItems: 'center', borderRadius: 16, backgroundColor: '#EF4444' },
+  modalConfirmText: { fontSize: 15, fontWeight: '800', color: '#FFFFFF' }
+});

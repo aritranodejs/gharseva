@@ -1,0 +1,363 @@
+# 🏠 GharSeva – FINAL PRODUCTION DOCUMENTATION (APP-FIRST, LOCATION-AWARE)
+
+---
+
+## 📌 1. Vision
+
+GharSeva is a dynamic, scalable, app-first home services platform that delivers affordable, reliable services while empowering local workers. The system is designed to match customers with nearby workers efficiently using pincode + real-time location.
+
+---
+
+## 🎯 2. Mission
+
+* Deliver high-quality home services at affordable prices
+* Build strong customer trust with reliable fulfillment
+* Enable local employment with minimal travel for workers
+* Operate a fully digital, app-driven, data-first platform
+
+---
+
+## 🧠 3. Core Product Philosophy
+
+> “100% App-First. Backend-driven. Location-aware. Nothing is hardcoded.”
+
+### Key Principles:
+
+* All bookings happen **only inside the app**
+* No manual/offline booking channels
+* All services, pricing, and locations are dynamic (DB-driven)
+* Pincode controls availability; GPS optimizes assignment
+* Frontend renders backend data (no hardcoding)
+
+---
+
+# 🏗️ 4. SYSTEM ARCHITECTURE OVERVIEW
+
+## Tech Stack
+
+* Frontend: React Native (Android-first)
+* Backend: Node.js (Microservices)
+* Database: MongoDB (GeoJSON for location)
+* Realtime: WebSockets (Socket.IO)
+* Queue/Cache: Redis (assignment queue, timeouts)
+
+## Core Microservices
+
+* Auth/User Service (OTP login, profiles, addresses)
+* Service Management (categories, services – dynamic)
+* Package Service (bundles, subscriptions)
+* Booking Service (orders, lifecycle)
+* Worker Service (skills, availability, location)
+* Assignment Service (auto-assign engine)
+* Payment Service (COD + online later)
+* Notification Service (push/SMS; WhatsApp later only for notifications)
+
+---
+
+# 🗄️ 5. CORE DATA ENTITIES (DYNAMIC)
+
+## Categories
+
+* name, icon, isActive
+
+## Services
+
+* name, categoryId, priceType (fixed/hourly), basePrice, duration, isActive
+
+## Packages
+
+* name, services[], pricing, frequency (visits/week), duration (monthly), isActive
+
+## Pincodes (Serviceability)
+
+* pincode, areaName, city, isActive, maxBookingsPerDay
+
+## Workers
+
+* profile, skills[], assignedPincodes[], isOnline, availability, KYC status
+* location: GeoJSON Point { type, coordinates [lng, lat] }
+* lastLocationAt
+
+## Bookings
+
+* userId, serviceId/packageId, schedule, address, pincode
+* assignedWorkerId (nullable)
+* status (see lifecycle below)
+* price
+
+---
+
+# 📍 6. SERVICEABILITY & LOCATION MODEL
+
+## Pincode-Based (Primary – Day 1)
+
+* User address includes pincode
+* Backend validates serviceability
+* Only services available for that pincode are returned
+
+## GPS-Based (Assignment Optimization)
+
+* Workers send location every 5–10s when online or on a job
+* Stored as GeoJSON for geo-queries
+
+## Hybrid Model (Final)
+
+* **Pincode → availability & capacity control**
+* **GPS → nearest-worker assignment & routing**
+
+---
+
+# 🚀 7. PHASE-WISE IMPLEMENTATION PLAN
+
+---
+
+## 🟢 PHASE 0: FOUNDATION (Day 1–3)
+
+* Brand: **GharSeva**
+* Define initial service area (e.g., New Town / Salt Lake)
+* Setup repos, environments, CI basics
+* Create RN app shell (Auth + Home)
+
+**Output:** App shell + backend skeleton
+
+---
+
+## 🟡 PHASE 1: VALIDATION (Week 1–2)
+
+### Services:
+
+* Home Cleaning
+* Dishwashing (Bason Maja)
+* Clothes Washing (Kapor Kacha)
+
+### App (MVP):
+
+* OTP Login
+* Address + Pincode
+* Dynamic service list
+* Book service (date/time)
+* Confirmation screen
+
+### Ops:
+
+* Hire 2–3 workers
+* Assign via admin inside system
+* Collect ratings in-app
+
+**Goal:** First 20–30 customers (app-only)
+
+---
+
+## 🔵 PHASE 2: MVP COMPLETION (Week 3–6)
+
+### Features:
+
+* Dynamic services & categories
+* Pincode-based serviceability
+* Booking lifecycle
+* Basic payments (COD)
+
+### Apps:
+
+* Customer: browse → book → history
+* Worker: job requests → accept/reject → complete
+* Admin: manage services, pincodes, workers, assignments
+
+**Output:** Working MVP with real users
+
+---
+
+## 🟠 PHASE 3: OPERATIONS & STANDARDIZATION (Month 2–3)
+
+* Checklists per service
+* Ratings & reviews
+* Same-worker preference
+* Worker KYC & training
+
+**Output:** Stable ops, better retention
+
+---
+
+## 🔴 PHASE 4: PACKAGE & SUBSCRIPTION (Month 3–4)
+
+### Household Package:
+
+* Cleaning + Dishwashing + Laundry
+
+### Pricing:
+
+* Per visit: ₹499–₹699
+* Subscription: ₹1499 (2/wk), ₹2499 (4/wk), ₹3999 (daily)
+
+### Logic:
+
+* Package entity
+* Auto-generate recurring bookings
+* Prefer same worker
+* Track usage
+
+**Output:** Recurring revenue engine
+
+---
+
+## 🟣 PHASE 5: TRUST SERVICES (Month 4–5)
+
+* Child Care, Home Cook, Elder Care
+* Strict KYC & background checks
+
+---
+
+## ⚫ PHASE 6: SKILLED SERVICES (Month 5–6)
+
+* Electrician, Plumbing, Appliance/AC Repair
+
+---
+
+## 🧠 PHASE 7: SCALING (Month 6+)
+
+* Auto assignment (full), smart scheduling
+* Capacity per pincode
+* Data-driven pricing
+* Area-wise expansion
+
+---
+
+# ⚙️ 8. CORE BUSINESS LOGIC
+
+## Booking Flow:
+
+1. User logs in (OTP)
+2. Selects/creates address (pincode)
+3. Check serviceability
+4. Fetch dynamic services/packages
+5. Select service/package & slot
+6. Create booking (status: `searching_worker`)
+7. Trigger assignment engine
+
+## Booking Status Lifecycle:
+
+* `pending` → `searching_worker` → `pending_acceptance` → `confirmed`
+* `in_progress` → `completed` / `cancelled`
+
+---
+
+# 🤖 9. AUTO-ASSIGNMENT ENGINE (CORE)
+
+## Goals:
+
+* Match **same-pincode** workers
+* Minimize travel using **nearest GPS**
+* Ensure quick acceptance
+
+## Selection Priority:
+
+1. Same pincode
+2. Skill match
+3. Availability (isOnline + not overloaded)
+4. Nearest distance (geo query)
+
+## Flow:
+
+* Fetch top N (1–3) nearest eligible workers
+* Send realtime job request
+* Worker has 30–60s to accept
+* First accept → assign & confirm
+* Others auto-cancel
+* If none accept → retry next batch or fail gracefully
+
+## Pseudo Logic:
+
+```
+workers = findEligible(pincode, skill)
+nearest = sortByDistance(workers, userLocation)
+for w in nearest[0..N]:
+  sendRequest(w)
+wait for accept (timeout 30–60s)
+if accepted: confirm
+else: retry next batch
+```
+
+---
+
+# 📡 10. REAL-TIME & LOCATION TRACKING
+
+## Worker App:
+
+* Go Online/Offline toggle
+* Send location every 5–10s when online/on job
+
+## Backend:
+
+* Store GeoJSON point
+* Use `$near` queries for proximity
+
+## Notifications:
+
+* Realtime via WebSockets
+* Fallback push notifications
+
+---
+
+# 💰 11. REVENUE MODEL
+
+* Commission (15–30%)
+* Subscription packages (primary)
+* Surge/urgent fees (later)
+
+---
+
+# ⚠️ 12. CHALLENGES & SOLUTIONS
+
+| Problem         | Solution                        |
+| --------------- | ------------------------------- |
+| Worker no-show  | Backup assignment + penalties   |
+| Quality issues  | Training + checklists + ratings |
+| Trust issues    | KYC + reviews                   |
+| Area overload   | Pincode capacity limits         |
+| Slow assignment | Realtime + batch dispatch       |
+
+---
+
+# 📱 13. FRONTEND PRINCIPLES (React Native)
+
+* No hardcoded services/categories
+* Fetch everything via APIs
+* Minimal booking flow (≤ 4 steps)
+* OTP login, fast UX
+
+---
+
+# 🔒 14. BOOKING CHANNEL POLICY (FINAL)
+
+* ✅ All bookings: **GharSeva Mobile App only**
+* ❌ No WhatsApp booking
+* ❌ No manual/offline booking
+* 🔔 Notifications: Push/SMS; WhatsApp later only for notifications
+
+---
+
+# 🔥 15. KEY SUCCESS FACTORS
+
+* Consistent service quality
+* Strong worker management
+* Fast, reliable app experience
+* Efficient local matching (low travel)
+* Subscription adoption
+
+---
+
+# 🏆 16. FINAL CONCLUSION
+
+GharSeva is a **fully digital, app-first, location-aware platform**.
+
+Execute phase-wise:
+
+* Start small → Validate → MVP → Packages → Auto-assign → Scale
+
+👉 Ensures efficient operations, happy workers (less travel), and scalable growth.
+
+---
+
+## ✅ IMMEDIATE ACTION
+
+Build MVP (auth + services + booking + basic assignment) and acquire your first 20 customers **through the app only**.
