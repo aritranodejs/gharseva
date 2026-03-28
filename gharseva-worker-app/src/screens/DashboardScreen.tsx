@@ -6,7 +6,7 @@ import { Audio } from 'expo-av';
 import { io, Socket } from 'socket.io-client';
 import api, { getImageUrl } from '../services/api';
 import { getCurrentWorkerLocation } from '../utils/helpers';
-import { LogOut as LogOutIcon, Bell as BellIcon, Briefcase as BriefcaseIcon, MapPin as MapPinIcon, CheckCircle2 as CheckCircle2Icon, Clock as ClockIcon, Star as StarIcon } from 'lucide-react-native';
+import { LogOut as LogOutIcon, Bell as BellIcon, Briefcase as BriefcaseIcon, MapPin as MapPinIcon, CheckCircle2 as CheckCircle2Icon, Clock as ClockIcon, Star as StarIcon, Wallet as WalletIcon, ChevronRight as ChevronRightIcon, User as UserIcon, HelpCircle as HelpIcon } from 'lucide-react-native';
 
 const LogOut = LogOutIcon as any;
 const Bell = BellIcon as any;
@@ -15,6 +15,10 @@ const MapPin = MapPinIcon as any;
 const CheckCircle2 = CheckCircle2Icon as any;
 const Clock = ClockIcon as any;
 const Star = StarIcon as any;
+const Wallet = WalletIcon as any;
+const ChevronRight = ChevronRightIcon as any;
+const User = UserIcon as any;
+const Help = HelpIcon as any;
 import PremiumToast, { ToastType } from '../components/PremiumToast';
 
 interface BookingRequest {
@@ -347,6 +351,56 @@ export default function DashboardScreen({ onLogout }: { onLogin?: () => void, on
       )}
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {/* Earnings Summary Row */}
+        <View style={styles.summaryRow}>
+           <TouchableOpacity style={styles.summaryCard} onPress={() => navigation.navigate('Profile')}>
+              <View style={[styles.summaryIcon, { backgroundColor: '#F0FDF4' }]}>
+                 <Wallet size={20} color="#16A34A" />
+              </View>
+              <View>
+                 <Text style={styles.summaryLabel}>Today's Earnings</Text>
+                 <Text style={styles.summaryValue}>₹{workerData?.todayEarnings || 0}</Text>
+              </View>
+           </TouchableOpacity>
+           <TouchableOpacity style={styles.summaryCard} onPress={() => navigation.navigate('Profile')}>
+              <View style={[styles.summaryIcon, { backgroundColor: '#EEF2FF' }]}>
+                 <Star size={20} color="#4F46E5" fill="#4F46E5" />
+              </View>
+              <View>
+                 <Text style={styles.summaryLabel}>Rating</Text>
+                 <Text style={styles.summaryValue}>{workerData?.rating || '4.8'}</Text>
+              </View>
+           </TouchableOpacity>
+        </View>
+
+        {/* Quick Actions Grid */}
+        <View style={styles.actionsGrid}>
+           <TouchableOpacity style={styles.actionItem} onPress={() => navigation.navigate('Profile')}>
+              <View style={[styles.actionIcon, { backgroundColor: '#F5F3FF' }]}>
+                 <User size={20} color="#7C3AED" />
+              </View>
+              <Text style={styles.actionText}>Profile</Text>
+           </TouchableOpacity>
+           <TouchableOpacity style={styles.actionItem} onPress={() => navigation.navigate('Profile')}>
+              <View style={[styles.actionIcon, { backgroundColor: '#FFF7ED' }]}>
+                 <Briefcase size={20} color="#EA580C" />
+              </View>
+              <Text style={styles.actionText}>My Skills</Text>
+           </TouchableOpacity>
+           <TouchableOpacity style={styles.actionItem} onPress={() => navigation.navigate('Profile')}>
+              <View style={[styles.actionIcon, { backgroundColor: '#F0F9FF' }]}>
+                 <CheckCircle2 size={20} color="#0284C7" />
+              </View>
+              <Text style={styles.actionText}>Docs</Text>
+           </TouchableOpacity>
+           <TouchableOpacity style={styles.actionItem} onPress={() => showToast('Support is coming soon!', 'info')}>
+              <View style={[styles.actionIcon, { backgroundColor: '#FEF2F2' }]}>
+                 <Help size={20} color="#DC2626" />
+              </View>
+              <Text style={styles.actionText}>Support</Text>
+           </TouchableOpacity>
+        </View>
+
         {/* Tab Toggle */}
         <View style={styles.tabContainer}>
            <TouchableOpacity 
@@ -609,6 +663,17 @@ const styles = StyleSheet.create({
   activeTabBtn: { backgroundColor: '#FFFFFF', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
   tabText: { fontSize: 14, fontWeight: '600', color: '#6B7280' },
   activeTabText: { color: '#4F46E5', fontWeight: '800' },
+
+  summaryRow: { flexDirection: 'row', gap: 12, marginBottom: 20 },
+  summaryCard: { flex: 1, backgroundColor: '#FFFFFF', borderRadius: 20, padding: 16, flexDirection: 'row', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 },
+  summaryIcon: { width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+  summaryLabel: { fontSize: 10, color: '#6B7280', fontWeight: '800', textTransform: 'uppercase' },
+  summaryValue: { fontSize: 16, fontWeight: '900', color: '#111827', marginTop: 1 },
+
+  actionsGrid: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24 },
+  actionItem: { alignItems: 'center', width: '22%' },
+  actionIcon: { width: 50, height: 50, borderRadius: 16, justifyContent: 'center', alignItems: 'center', marginBottom: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 5, elevation: 2 },
+  actionText: { fontSize: 11, fontWeight: '800', color: '#374151' },
 
   emptyCard: { padding: 40, alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 24, marginTop: 10 },
   emptyTitle: { fontSize: 18, fontWeight: '800', color: '#374151', marginTop: 16 },

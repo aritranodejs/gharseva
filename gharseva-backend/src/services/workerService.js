@@ -65,6 +65,14 @@ class WorkerService {
        worker.profilePicture = updates.profilePicture;
     }
 
+    if (updates.categories) {
+       worker.categories = typeof updates.categories === 'string' ? JSON.parse(updates.categories) : updates.categories;
+    }
+
+    if (updates.skills) {
+       worker.skills = typeof updates.skills === 'string' ? JSON.parse(updates.skills) : updates.skills;
+    }
+
     await worker.save();
     return worker;
   }

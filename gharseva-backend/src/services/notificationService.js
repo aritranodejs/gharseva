@@ -1,12 +1,16 @@
 const notificationRepository = require('../repositories/notificationRepository');
 
 class NotificationService {
-  async getUserNotifications(userId) {
-    return await notificationRepository.findByUserId(userId);
+  async getNotifications(userId, workerId) {
+    return await notificationRepository.findNotifications(userId, workerId);
   }
 
-  async readNotification(id, userId) {
-    return await notificationRepository.markAsRead(id, userId);
+  async readNotification(id, userId, workerId) {
+    return await notificationRepository.markAsRead(id, userId, workerId);
+  }
+
+  async readAllNotifications(userId, workerId) {
+    return await notificationRepository.markAllAsRead(userId, workerId);
   }
 }
 

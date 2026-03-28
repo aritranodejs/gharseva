@@ -5,7 +5,12 @@ const notificationSchema = mongoose.Schema(
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: true,
+      required: false,
+    },
+    workerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Worker',
+      required: false,
     },
     title: {
       type: String,

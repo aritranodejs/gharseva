@@ -1,15 +1,22 @@
 const Worker = require('../../models/Worker');
+const Category = require('../../models/Category');
 
 const seedWorkers = async () => {
   await Worker.deleteMany({});
+  
+  // Fetch categories to link by ID
+  const categories = await Category.find({});
+  const getCatId = (slug) => categories.find(c => c.slug === slug)?._id;
+
   await Worker.create([
     {
       name: 'Ramesh Kumar',
-      phoneNumber: '9876543210', // Standard 10 digits for India
+      phoneNumber: '9876543210',
       password: 'Ramesh',
-      location: { type: 'Point', coordinates: [77.5946, 12.9716] }, // Bangalore
+      location: { type: 'Point', coordinates: [77.5946, 12.9716] },
       pincodes: ['700156', '700091'],
       skills: ['electrician', 'plumbing'],
+      categories: [getCatId('electrician'), getCatId('plumbing')].filter(Boolean),
       activeBookingsCount: 0,
       rating: 4.8,
       isTrustVerified: true,
@@ -24,6 +31,7 @@ const seedWorkers = async () => {
       location: { type: 'Point', coordinates: [77.6000, 12.9800] },
       pincodes: ['700156', '700135'],
       skills: ['cleaning'],
+      categories: [getCatId('cleaning')].filter(Boolean),
       activeBookingsCount: 0,
       rating: 4.9,
       isTrustVerified: true,
@@ -38,6 +46,7 @@ const seedWorkers = async () => {
       location: { type: 'Point', coordinates: [77.6100, 12.9900] },
       pincodes: ['700091', '700135'],
       skills: ['care', 'cook'],
+      categories: [getCatId('care'), getCatId('cook')].filter(Boolean),
       activeBookingsCount: 0,
       rating: 4.7,
       isTrustVerified: true,

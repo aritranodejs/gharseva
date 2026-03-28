@@ -1,15 +1,28 @@
 const Notification = require('../models/Notification');
 
 class NotificationRepository {
-  async findByUserId(userId) {
-    return await Notification.find({ userId }).sort({ createdAt: -1 });
+  async findNotifications(userId, workerId) {
+    const query = userId ? { userId } : { workerId };
+    return await Notification.find(query).sort({ createdAt: -1 });
   }
 
-  async markAsRead(id, userId) {
+  async markAsRead(id, userId, workerId) {
+    const query = { _id: id };
+    if (userId) query.userId = userId;
+    if (workerId) query.workerId = workerId;
+    
     return await Notification.findOneAndUpdate(
-      { _id: id, userId },
+      query,
       { isRead: true },
       { new: true }
+    );
+  }
+
+  async markAllAsRead(userId, workerId) {
+    const query = userId ? { userId } : { workerId };
+    return await Notification.updateMany(
+      query,
+      { isRead: true }
     );
   }
 }

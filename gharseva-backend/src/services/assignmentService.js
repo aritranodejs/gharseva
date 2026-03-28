@@ -1,6 +1,7 @@
 const redisService = require('./redisService');
 const workerRepository = require('../repositories/workerRepository');
 const bookingRepository = require('../repositories/bookingRepository');
+const Notification = require('../models/Notification');
 const { BOOKING_STATUS } = require('../utils/constants');
 
 class AssignmentService {
@@ -22,7 +23,7 @@ class AssignmentService {
       const query = {
         isOnline: true,
         isActive: true,
-        skills: categoryId,
+        categories: categoryId,
         ...(isTrustService ? { isTrustVerified: true } : {}),
       };
 
@@ -69,9 +70,17 @@ class AssignmentService {
           price: booking.price
         };
 
-        eligibleWorkers.slice(0, 3).forEach(worker => {
+        eligibleWorkers.slice(0, 3).forEach(async (worker) => {
           io.to(`worker_${worker._id}`).emit('new_booking_request', payload);
           console.log(`[AssignmentService] Broadcast → Worker: ${worker.name}`);
+
+          // Save to Notification History for Worker App
+          await Notification.create({
+            workerId: worker._id,
+            title: 'New Booking Available! 🚀',
+            message: `New ${booking.serviceId?.name || 'Service'} request near you. Claim it now to earn!`,
+            type: 'booking'
+          }).catch(err => console.error('[AssignmentService] Notification save error:', err));
         });
       }
 
