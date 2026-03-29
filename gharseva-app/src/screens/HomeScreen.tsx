@@ -166,8 +166,12 @@ export default function HomeScreen() {
       if (profileData.profilePicture) {
         setProfilePic(getImageUrl(profileData.profilePicture));
       }
-    } catch (error) {
+    } catch (error: any) {
        console.error('Error fetching addresses for home:', error);
+       if (error.response?.status === 401 || error.message?.includes('token') || error.message?.includes('401')) {
+         await AsyncStorage.multiRemove(['userAccessToken', 'userRefreshToken', 'userData']);
+         navigation.reset({ index: 0, routes: [{ name: 'Auth' }] });
+       }
     }
   };
 
@@ -267,6 +271,7 @@ export default function HomeScreen() {
       setLocationLoading(false);
     }
   };
+
 
   const handlePincodeSubmit = async () => {
     if (!pincodeSearch || pincodeSearch.length < 6) {
