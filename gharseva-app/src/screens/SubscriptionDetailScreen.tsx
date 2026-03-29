@@ -1,25 +1,41 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft, Package, Calendar, MapPin, PauseCircle, XCircle, CheckCircle2 } from 'lucide-react-native';
 import api from '../services/api';
+import PremiumToast from '../components/PremiumToast';
+import PremiumConfirmModal from '../components/PremiumConfirmModal';
 
 export default function SubscriptionDetailScreen({ route, navigation }: any) {
   const insets = useSafeAreaInsets();
   const [subscription, setSubscription] = useState(route.params.subscription);
   const [updating, setUpdating] = useState(false);
 
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastType, setToastType] = useState<'success' | 'error' | 'info'>('info');
+
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [confirmConfig, setConfirmConfig] = useState<any>({ title: '', message: '', type: 'info', onConfirm: () => {} });
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setToastMessage(message);
+    setToastType(type);
+    setToastVisible(true);
+  };
+
   const updateStatus = async (status: string) => {
     setUpdating(true);
     try {
       await api.put(`subscriptions/${subscription._id}/status`, { status });
       setSubscription({ ...subscription, status });
-      Alert.alert('Status Updated', `Your subscription has been ${status}.`);
+      showToast(`Your subscription has been ${status}.`, 'success');
     } catch (error) {
       console.error('Error updating status', error);
-      Alert.alert('Error', 'Could not update subscription status');
+      showToast('Could not update subscription status', 'error');
     } finally {
       setUpdating(false);
+      setShowConfirmModal(false);
     }
   };
 
@@ -27,18 +43,24 @@ export default function SubscriptionDetailScreen({ route, navigation }: any) {
     if (subscription.status === 'paused') {
        updateStatus('active');
     } else {
-       Alert.alert('Pause Subscription', 'Are you sure you want to pause this subscription? Services will not be scheduled.', [
-         { text: 'Cancel', style: 'cancel' },
-         { text: 'Pause', style: 'destructive', onPress: () => updateStatus('paused') }
-       ]);
+       setConfirmConfig({
+         title: 'Pause Subscription',
+         message: 'Are you sure you want to pause this subscription? Scheduled services will be suspended until you resume.',
+         type: 'warning',
+         onConfirm: () => updateStatus('paused')
+       });
+       setShowConfirmModal(true);
     }
   };
 
   const handleCancel = () => {
-    Alert.alert('Cancel Subscription', 'Are you sure you want to permanently cancel this subscription?', [
-      { text: 'No', style: 'cancel' },
-      { text: 'Yes, Cancel', style: 'destructive', onPress: () => updateStatus('cancelled') }
-    ]);
+    setConfirmConfig({
+      title: 'Cancel Subscription',
+      message: 'Are you sure you want to permanently cancel this subscription? This action cannot be undone.',
+      type: 'danger',
+      onConfirm: () => updateStatus('cancelled')
+    });
+    setShowConfirmModal(true);
   };
 
   if (!subscription) return null;
@@ -138,6 +160,22 @@ export default function SubscriptionDetailScreen({ route, navigation }: any) {
 
          <View style={{ height: 60 }} />
       </ScrollView>
+
+      <PremiumToast 
+        visible={toastVisible} 
+        message={toastMessage} 
+        type={toastType} 
+        onHide={() => setToastVisible(false)} 
+      />
+
+      <PremiumConfirmModal 
+        visible={showConfirmModal} 
+        title={confirmConfig.title} 
+        message={confirmConfig.message} 
+        type={confirmConfig.type} 
+        onConfirm={confirmConfig.onConfirm} 
+        onCancel={() => setShowConfirmModal(false)} 
+      />
     </View>
   );
 }

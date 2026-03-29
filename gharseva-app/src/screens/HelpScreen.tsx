@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar, Activi
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft, MessageCircle, Phone, Mail, HelpCircle, ChevronDown, ChevronUp } from 'lucide-react-native';
 import api from '../services/api';
+import PremiumToast from '../components/PremiumToast';
 
 if (Platform.OS === 'android') {
   if (UIManager.setLayoutAnimationEnabledExperimental) {
@@ -22,6 +23,16 @@ export default function HelpScreen({ navigation }: any) {
   const [faqs, setFaqs] = useState<FAQ[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastType, setToastType] = useState<'success' | 'error' | 'info'>('info');
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setToastMessage(message);
+    setToastType(type);
+    setToastVisible(true);
+  };
 
   useEffect(() => {
     fetchFaqs();
@@ -66,15 +77,15 @@ export default function HelpScreen({ navigation }: any) {
         <View style={styles.contactSection}>
           <Text style={styles.subTitle}>GET IN TOUCH</Text>
           <View style={styles.contactGrid}>
-            <TouchableOpacity style={styles.contactCard}>
+            <TouchableOpacity style={styles.contactCard} onPress={() => showToast('Connecting to Support Chat...', 'info')}>
               <View style={[styles.contactIcon, { backgroundColor: '#EEF2FF' }]}><MessageCircle size={24} color="#4F46E5" /></View>
               <Text style={styles.contactLabel}>Chat</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.contactCard}>
+            <TouchableOpacity style={styles.contactCard} onPress={() => showToast('Dialing Support Helpline...', 'info')}>
               <View style={[styles.contactIcon, { backgroundColor: '#F0FDF4' }]}><Phone size={24} color="#10B981" /></View>
               <Text style={styles.contactLabel}>Call</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.contactCard}>
+            <TouchableOpacity style={styles.contactCard} onPress={() => showToast('Opening Email Composer...', 'info')}>
               <View style={[styles.contactIcon, { backgroundColor: '#FFF7ED' }]}><Mail size={24} color="#F59E0B" /></View>
               <Text style={styles.contactLabel}>Email</Text>
             </TouchableOpacity>
@@ -101,6 +112,13 @@ export default function HelpScreen({ navigation }: any) {
           ))}
         </View>
       </ScrollView>
+
+      <PremiumToast 
+        visible={toastVisible} 
+        message={toastMessage} 
+        type={toastType} 
+        onHide={() => setToastVisible(false)} 
+      />
     </View>
   );
 }

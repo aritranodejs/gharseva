@@ -72,7 +72,10 @@ class BookingController {
 
   async getById(req, res) {
     try {
-      const booking = await bookingService.getBookingById(req.params.id, req.user.id);
+      const userId = req.user ? req.user.id : null;
+      const workerId = req.worker ? req.worker._id : null;
+      
+      const booking = await bookingService.getBookingById(req.params.id, userId, workerId);
       sendSuccess(res, booking);
     } catch (err) {
       sendError(res, err.message, 404);

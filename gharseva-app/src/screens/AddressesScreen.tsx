@@ -4,6 +4,8 @@ import axios from 'axios';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft, MapPin, Plus, Home, Briefcase, Trash2, X, Search, Navigation, Edit2 } from 'lucide-react-native';
 import api from '../services/api';
+import PremiumToast from '../components/PremiumToast';
+import PremiumConfirmModal from '../components/PremiumConfirmModal';
 
 type Address = {
   _id: string;
@@ -35,6 +37,19 @@ export default function AddressesScreen({ navigation }: any) {
   const [searchQuery, setSearchQuery] = useState('');
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastType, setToastType] = useState<'success' | 'error' | 'info'>('info');
+
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [addressToDelete, setAddressToDelete] = useState<string | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setToastMessage(message);
+    setToastType(type);
+    setToastVisible(true);
+  };
 
   // Live Google Places API Integration
   const handleSearch = async (text: string) => {
@@ -83,7 +98,7 @@ export default function AddressesScreen({ navigation }: any) {
       setAddresses(response.data.data.addresses || []);
     } catch (error) {
        console.error('Error fetching addresses:', error);
-       Alert.alert('Error', 'Failed to load addresses.');
+       showToast('Failed to load addresses.', 'error');
     } finally {
        setLoading(false);
     }
@@ -110,7 +125,7 @@ export default function AddressesScreen({ navigation }: any) {
 
   const handleAddAddress = async () => {
     if (!newAddr.street || !newAddr.pinCode) {
-      Alert.alert('Error', 'Please fill in all fields.');
+      showToast('Please fill in all fields.', 'info');
       return;
     }
     setSubmitting(true);
@@ -118,43 +133,40 @@ export default function AddressesScreen({ navigation }: any) {
       if (editingId) {
         const response = await api.put(`auth/addresses/${editingId}`, newAddr);
         setAddresses(response.data.data);
-        Alert.alert('Success', 'Address updated successfully!');
+        showToast('Address updated successfully!', 'success');
       } else {
         const response = await api.post('auth/addresses', newAddr);
         setAddresses(response.data.data);
-        Alert.alert('Success', 'Address added successfully!');
+        showToast('Address added successfully!', 'success');
       }
       setModalVisible(false);
       setEditingId(null);
       setNewAddr({ label: 'Home', street: '', city: 'Kolkata', pinCode: '', lat: 0, lng: 0 });
     } catch (error) {
        console.error('Error handling address:', error);
-       Alert.alert('Error', 'Failed to save address.');
+       showToast('Failed to save address.', 'error');
     } finally {
        setSubmitting(false);
     }
   };
 
-  const handleDeleteAddress = async (id: string) => {
-    Alert.alert(
-      'Delete Address',
-      'Are you sure you want to remove this address?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Delete', 
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const response = await api.delete(`auth/addresses/${id}`);
-              setAddresses(response.data.data);
-            } catch (error) {
-               Alert.alert('Error', 'Failed to delete address.');
-            }
-          }
-        }
-      ]
-    );
+  const handleDeleteAddress = (id: string) => {
+    setAddressToDelete(id);
+    setShowDeleteModal(true);
+  };
+
+  const confirmDeleteAddress = async () => {
+    if (!addressToDelete) return;
+    try {
+      const response = await api.delete(`auth/addresses/${addressToDelete}`);
+      setAddresses(response.data.data);
+      showToast('Address removed successfully.', 'success');
+    } catch (error) {
+       showToast('Failed to delete address.', 'error');
+    } finally {
+      setShowDeleteModal(false);
+      setAddressToDelete(null);
+    }
   };
 
   const getIcon = (label: string) => {
@@ -304,6 +316,24 @@ export default function AddressesScreen({ navigation }: any) {
             </View>
          </View>
       </Modal>
+      {/* Toast */}
+      <PremiumToast 
+        visible={toastVisible} 
+        message={toastMessage} 
+        type={toastType} 
+        onHide={() => setToastVisible(false)} 
+      />
+
+      <PremiumConfirmModal 
+        visible={showDeleteModal} 
+        title="Delete Address" 
+        message="Are you sure you want to permanently remove this address from your profile?" 
+        confirmText="Remove" 
+        cancelText="Cancel" 
+        onConfirm={confirmDeleteAddress} 
+        onCancel={() => setShowDeleteModal(false)} 
+        type="danger" 
+      />
     </View>
   );
 }

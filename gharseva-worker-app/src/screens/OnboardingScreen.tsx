@@ -13,6 +13,7 @@ const User = UserIcon as any;
 const CheckCircle2 = CheckCircle2Icon as any;
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import api from '../services/api';
+import PremiumToast from '../components/PremiumToast';
 
 export default function OnboardingScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
@@ -53,6 +54,16 @@ export default function OnboardingScreen({ navigation }: any) {
     certification: null as any
   });
 
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastType, setToastType] = useState<'success' | 'error' | 'info'>('info');
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setToastMessage(message);
+    setToastType(type);
+    setToastVisible(true);
+  };
+
   useEffect(() => {
     const fetchCats = async () => {
       try {
@@ -89,11 +100,26 @@ export default function OnboardingScreen({ navigation }: any) {
     const { needsPolice, needsCert } = getRequirements();
     
     // Validation
-    if (!form.profilePicture) return Alert.alert('Photo Required', 'Please upload a profile picture.');
-    if (!form.aadhaarNumber || form.aadhaarNumber.length < 12) return Alert.alert('Aadhaar Required', 'Please enter a valid 12-digit Aadhaar number.');
-    if (!form.aadhaarImage) return Alert.alert('Aadhaar Photo Required', 'Please upload your Aadhaar card photo.');
-    if (needsPolice && !form.policeVerification) return Alert.alert('Police Verification Required', 'Selected services require a police verification certificate.');
-    if (needsCert && !form.certification) return Alert.alert('Certification Required', 'Selected services require a trade certification.');
+    if (!form.profilePicture) {
+      showToast('Please upload a profile picture.', 'info');
+      return;
+    }
+    if (!form.aadhaarNumber || form.aadhaarNumber.length < 12) {
+      showToast('Please enter a valid 12-digit Aadhaar number.', 'info');
+      return;
+    }
+    if (!form.aadhaarImage) {
+      showToast('Please upload your Aadhaar card photo.', 'info');
+      return;
+    }
+    if (needsPolice && !form.policeVerification) {
+      showToast('Selected services require a police verification certificate.', 'info');
+      return;
+    }
+    if (needsCert && !form.certification) {
+      showToast('Selected services require a trade certification.', 'info');
+      return;
+    }
 
     setIsLoading(true);
     try {
@@ -125,10 +151,12 @@ export default function OnboardingScreen({ navigation }: any) {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
 
-      Alert.alert('Application Submitted! 🚀', 'Your application is now successfully pending manual Admin Approval. You will receive an SMS once your account is live.');
-      navigation.navigate('Login');
+      showToast('Your application is pending manual Admin Approval. You will receive an SMS once your account is live.', 'success');
+      setTimeout(() => {
+        navigation.navigate('Login');
+      }, 3000);
     } catch (err: any) {
-      Alert.alert('Submission Error', err.response?.data?.message || 'Something went wrong.');
+      showToast(err.response?.data?.message || 'Something went wrong.', 'error');
     } finally {
       setIsLoading(false);
     }
@@ -371,6 +399,13 @@ export default function OnboardingScreen({ navigation }: any) {
       >
         {renderStep()}
       </ScrollView>
+
+      <PremiumToast 
+        visible={toastVisible} 
+        message={toastMessage} 
+        type={toastType} 
+        onHide={() => setToastVisible(false)} 
+      />
     </View>
   );
 }

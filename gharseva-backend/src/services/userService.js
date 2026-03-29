@@ -1,5 +1,5 @@
 const userRepository = require('../repositories/userRepository');
-const { generateToken } = require('../utils/auth');
+const { generateTokens } = require('../utils/auth');
 const { uploadImage } = require('../services/imageUpload');
 
 class UserService {
@@ -11,12 +11,15 @@ class UserService {
       user = await userRepository.create({ phoneNumber, isVerified: true });
     }
 
-    const token = generateToken(user._id, 'user');
+    const tokens = generateTokens(user._id, 'user');
+    const tokenStore = require('../utils/tokenStore');
+    await tokenStore.set(`rf_${tokens.refreshToken}`, user._id.toString(), 7 * 24 * 60 * 60); // 7 days
+
     return {
       _id: user._id,
       phoneNumber: user.phoneNumber,
       isVerified: user.isVerified,
-      token,
+      ...tokens,
     };
   }
 

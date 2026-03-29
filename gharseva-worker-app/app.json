@@ -1,8 +1,13 @@
 {
   "expo": {
-    "name": "gharseva-worker-app",
+    "name": "GharSeva Partner",
     "slug": "gharseva-worker-app",
     "version": "1.0.0",
+    "extra": {
+      "eas": {
+        "projectId": "96f7800c-751b-5309-a78b-2269024794fc"
+      }
+    },
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -11,17 +16,41 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#4F46E5",
+          "sounds": [],
+          "androidMode": "default",
+          "androidCollapsedTitle": "GharSeva Partner"
+        }
+      ]
+    ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.gharseva.worker",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "GharSeva needs your location to assign you nearby jobs.",
+        "NSLocationAlwaysUsageDescription": "GharSeva needs your location in the background to track job progress."
+      }
     },
     "android": {
+      "package": "com.gharseva.worker",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE",
+        "android.permission.SCHEDULE_EXACT_ALARM",
+        "android.permission.POST_NOTIFICATIONS"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"

@@ -59,20 +59,36 @@ class AssignmentService {
       // 4. Store State in Redis
       await redisService.set(`broadcast:${bookingId}`, 'active', 60);
 
-      // 5. Broadcast via Socket.io
+      // 5. Broadcast via Socket.io & Push Notifications
       const io = global.io;
+      const pushService = require('./pushNotificationService');
+
       if (io) {
         const payload = {
           bookingId: booking._id,
           pincode: booking.pincode,
           address: booking.address,
           serviceName: booking.serviceId?.name,
-          price: booking.price
+          price: booking.price,
+          customerName: booking.userId?.name,
+          customerPicture: booking.userId?.profilePicture
         };
 
         eligibleWorkers.slice(0, 3).forEach(async (worker) => {
+          // 5a. Socket.io (Real-time in-app)
           io.to(`worker_${worker._id}`).emit('new_booking_request', payload);
           console.log(`[AssignmentService] Broadcast → Worker: ${worker.name}`);
+
+          // 5b. Push Notification (Background/Locked)
+          if (worker.pushToken) {
+            const earnings = booking.price - Math.round(booking.price * 0.1);
+            pushService.sendPushNotification(
+              worker.pushToken,
+              'New Job Available! 🚀',
+              `Claim ${booking.serviceId?.name || 'Service'} at ${booking.address.split(',')[0]}. Earn ₹${earnings}!`,
+              { type: 'new_job', bookingId: booking._id }
+            ).catch(err => console.error('[PushError]', err));
+          }
 
           // Save to Notification History for Worker App
           await Notification.create({

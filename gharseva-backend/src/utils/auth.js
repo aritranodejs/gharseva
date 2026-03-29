@@ -1,15 +1,31 @@
 const jwt = require('jsonwebtoken');
 
 /**
- * Generate a JWT token for a specific user/worker
- * @param {string} id - The MongoDB ID
- * @param {string} role - 'user' or 'worker'
- * @returns {string} JWT Token
+ * Generate Access Token (short-lived)
  */
-const generateToken = (id, role = 'user') => {
+const generateAccessToken = (id, role = 'user') => {
   return jwt.sign({ id, role }, process.env.JWT_SECRET, {
-    expiresIn: '30d',
+    expiresIn: '15m'
   });
 };
 
-module.exports = { generateToken };
+/**
+ * Generate Refresh Token (long-lived)
+ */
+const generateRefreshToken = (id, role = 'user') => {
+  return jwt.sign({ id, role }, process.env.JWT_SECRET, {
+    expiresIn: '7d'
+  });
+};
+
+/**
+ * Generate both tokens
+ */
+const generateTokens = (id, role = 'user') => {
+  return {
+    accessToken: generateAccessToken(id, role),
+    refreshToken: generateRefreshToken(id, role)
+  };
+};
+
+module.exports = { generateAccessToken, generateRefreshToken, generateTokens };

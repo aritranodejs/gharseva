@@ -4,6 +4,7 @@ import { User as UserIcon, Settings, CreditCard, HelpCircle, LogOut, ChevronRigh
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import api, { getImageUrl } from '../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import PremiumConfirmModal from '../components/PremiumConfirmModal';
 
 type UserData = {
   _id: string;
@@ -19,6 +20,7 @@ export default function ProfileScreen({ navigation }: any) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   useEffect(() => {
     fetchProfile();
@@ -51,21 +53,18 @@ export default function ProfileScreen({ navigation }: any) {
   };
 
   const handleLogout = async () => {
-    Alert.alert(
-      "Logout",
-      "Are you sure you want to logout?",
-      [
-        { text: "Cancel", style: "cancel" },
-        { 
-          text: "Logout", 
-          style: "destructive",
-          onPress: async () => {
-            await AsyncStorage.multiRemove(['userToken', 'userPhone']);
-            navigation.replace('Auth');
-          }
-        }
-      ]
-    );
+    setShowLogoutModal(true);
+  };
+
+  const confirmLogout = async () => {
+    try {
+      const refreshToken = await AsyncStorage.getItem('userRefreshToken');
+      await api.post('auth/logout', { refreshToken });
+    } catch (e) { /* ignore */ }
+    
+    await AsyncStorage.multiRemove(['userAccessToken', 'userRefreshToken', 'userId', 'userPhone']);
+    setShowLogoutModal(false);
+    navigation.replace('Auth');
   };
 
   const menuGroups = [
@@ -195,6 +194,17 @@ export default function ProfileScreen({ navigation }: any) {
         </View>
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      <PremiumConfirmModal 
+        visible={showLogoutModal} 
+        title="Logout" 
+        message="Are you sure you want to logout? You will need to login again to book services." 
+        confirmText="Logout" 
+        cancelText="Cancel" 
+        onConfirm={confirmLogout} 
+        onCancel={() => setShowLogoutModal(false)} 
+        type="danger" 
+      />
     </View>
   );
 }

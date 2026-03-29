@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft, User as UserIcon, Mail, Phone, Camera, Save } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import api, { getImageUrl } from '../services/api';
+import PremiumToast from '../components/PremiumToast';
 
 export default function ProfileDetailsScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
@@ -16,6 +17,16 @@ export default function ProfileDetailsScreen({ navigation }: any) {
     phoneNumber: '',
     profilePicture: ''
   });
+
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastType, setToastType] = useState<'success' | 'error' | 'info'>('info');
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setToastMessage(message);
+    setToastType(type);
+    setToastVisible(true);
+  };
 
   useEffect(() => {
     fetchProfile();
@@ -33,7 +44,7 @@ export default function ProfileDetailsScreen({ navigation }: any) {
       });
     } catch (error) {
        console.error('Error fetching profile:', error);
-       Alert.alert('Error', 'Failed to load profile details.');
+       showToast('Failed to load profile details.', 'error');
     } finally {
        setLoading(false);
     }
@@ -44,7 +55,7 @@ export default function ProfileDetailsScreen({ navigation }: any) {
       // Request permission
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission Required', 'Please allow access to your photo library to change your profile picture.');
+        showToast('Please allow access to your photo library to change your profile picture.', 'info');
         return;
       }
 
@@ -73,17 +84,17 @@ export default function ProfileDetailsScreen({ navigation }: any) {
           if (resData.profilePicture) {
             setProfile(prev => ({ ...prev, profilePicture: resData.profilePicture }));
           }
-          Alert.alert('Success', 'Profile picture updated!');
+          showToast('Profile picture updated!', 'success');
         } catch (err) {
            console.error('Error uploading image:', err);
-           Alert.alert('Error', 'Image could not be uploaded. Local preview shown.');
+           showToast('Image could not be uploaded. Local preview shown.', 'error');
         } finally {
            setUploadingImage(false);
         }
       }
     } catch (error) {
       console.error('Image picker error:', error);
-      Alert.alert('Error', 'Could not open image picker.');
+      showToast('Could not open image picker.', 'error');
     }
   };
 
@@ -94,10 +105,10 @@ export default function ProfileDetailsScreen({ navigation }: any) {
         name: profile.name,
         email: profile.email
       });
-      Alert.alert('Success', 'Profile updated successfully!');
+      showToast('Profile updated successfully!', 'success');
     } catch (error) {
        console.error('Error updating profile:', error);
-       Alert.alert('Error', 'Failed to update profile.');
+       showToast('Failed to update profile.', 'error');
     } finally {
        setSubmitting(false);
     }
@@ -202,6 +213,13 @@ export default function ProfileDetailsScreen({ navigation }: any) {
           )}
         </TouchableOpacity>
       </ScrollView>
+
+      <PremiumToast 
+        visible={toastVisible} 
+        message={toastMessage} 
+        type={toastType} 
+        onHide={() => setToastVisible(false)} 
+      />
     </View>
   );
 }

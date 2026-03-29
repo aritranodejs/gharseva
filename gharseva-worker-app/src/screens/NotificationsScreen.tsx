@@ -39,6 +39,15 @@ export default function NotificationsScreen({ navigation }: any) {
     fetchNotifications();
   };
 
+  const markAsRead = async (id: string) => {
+    try {
+      await api.put(`notifications/${id}/read`);
+      setNotifications(notifications.map(n => n._id === id ? { ...n, isRead: true } : n));
+    } catch (error) {
+       console.log('Error marking as read:', error);
+    }
+  };
+
   const markAllAsRead = async () => {
     try {
        await api.post('notifications/read-all');
@@ -88,7 +97,11 @@ export default function NotificationsScreen({ navigation }: any) {
            </View>
         ) : (
            notifications.map((notif: any) => (
-             <View key={notif._id} style={[styles.notificationCard, !notif.isRead && styles.unreadCard]}>
+             <TouchableOpacity 
+               key={notif._id} 
+               onPress={() => markAsRead(notif._id)}
+               style={[styles.notificationCard, !notif.isRead && styles.unreadCard]}
+             >
                 <View style={[styles.iconBox, !notif.isRead && styles.unreadIconBox]}>
                    <BellRing size={20} color={!notif.isRead ? '#4F46E5' : '#6B7280'} />
                 </View>
@@ -100,7 +113,7 @@ export default function NotificationsScreen({ navigation }: any) {
                    <Text style={styles.notifMessage}>{notif.message}</Text>
                    <Text style={styles.notifTime}>{new Date(notif.createdAt).toLocaleString()}</Text>
                 </View>
-             </View>
+             </TouchableOpacity>
            ))
         )}
       </ScrollView>

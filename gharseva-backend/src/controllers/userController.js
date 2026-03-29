@@ -30,7 +30,12 @@ class UserController {
 
   async updateProfile(req, res) {
     try {
-      const user = await userService.updateProfile(req.user.id, req.body);
+      const uploadFiles = req.files || {};
+      const updates = { ...req.body };
+      if (uploadFiles['profilePicture']) {
+         updates.profilePicture = `/uploads/${uploadFiles['profilePicture'][0].filename}`;
+      }
+      const user = await userService.updateProfile(req.user.id, updates);
       sendSuccess(res, user, 'Profile updated successfully');
     } catch (err) {
       sendError(res, err.message, 400);

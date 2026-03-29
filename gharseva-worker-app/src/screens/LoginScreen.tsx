@@ -11,6 +11,7 @@ const Briefcase = BriefcaseIcon as any;
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import api from '../services/api';
+import PremiumToast from '../components/PremiumToast';
 
 const { height } = Dimensions.get('window');
 
@@ -21,13 +22,23 @@ export default function LoginScreen({ onLogin }: { onLogin: () => void }) {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastType, setToastType] = useState<'success' | 'error' | 'info'>('info');
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setToastMessage(message);
+    setToastType(type);
+    setToastVisible(true);
+  };
+
   const handleLogin = async () => {
     if (phoneNumber.length < 10) {
-      Alert.alert('Invalid Number', 'Please enter a valid phone number');
+      showToast('Please enter a valid phone number', 'info');
       return;
     }
     if (!password) {
-      Alert.alert('Required', 'Please enter your password');
+      showToast('Please enter your password', 'info');
       return;
     }
 
@@ -35,13 +46,15 @@ export default function LoginScreen({ onLogin }: { onLogin: () => void }) {
     try {
       const response = await api.post('/workers/login', { phoneNumber, password });
       
-      if (response.data.data.token) {
-        await AsyncStorage.setItem('workerToken', response.data.data.token);
-        await AsyncStorage.setItem('workerData', JSON.stringify(response.data.data.worker));
+      if (response.data.data.accessToken) {
+        const { accessToken, refreshToken, worker } = response.data.data;
+        await AsyncStorage.setItem('workerAccessToken', accessToken);
+        await AsyncStorage.setItem('workerRefreshToken', refreshToken);
+        await AsyncStorage.setItem('workerData', JSON.stringify(worker));
         onLogin();
       }
     } catch (error: any) {
-      Alert.alert('Login Failed', error.response?.data?.message || 'Check your credentials and try again.');
+      showToast(error.response?.data?.message || 'Check your credentials and try again.', 'error');
     } finally {
       setIsLoading(false);
     }
@@ -59,9 +72,7 @@ export default function LoginScreen({ onLogin }: { onLogin: () => void }) {
         <View style={[styles.headerGraphic, { height: height * 0.38 }]}>
           <View style={styles.headerAccent} />
           <View style={styles.logoContainer}>
-            <View style={styles.iconBox}>
-               <Briefcase size={32} color="#FFFFFF" fill="#FFFFFF" />
-            </View>
+            <Image source={require('../../assets/logo_premium.png')} style={styles.logoImg} resizeMode="contain" />
             <Text style={styles.brandTitle}>GharSeva</Text>
             <Text style={styles.brandSub}>Partner Portal</Text>
           </View>
@@ -149,6 +160,13 @@ export default function LoginScreen({ onLogin }: { onLogin: () => void }) {
           <View style={{ height: insets.bottom + 20 }} />
         </KeyboardAvoidingView>
       </ScrollView>
+
+      <PremiumToast 
+        visible={toastVisible} 
+        message={toastMessage} 
+        type={toastType} 
+        onHide={() => setToastVisible(false)} 
+      />
     </View>
   );
 }
@@ -158,7 +176,7 @@ const styles = StyleSheet.create({
   headerGraphic: { backgroundColor: '#1E1B4B', justifyContent: 'center', alignItems: 'center', borderBottomLeftRadius: 40, borderBottomRightRadius: 40, overflow: 'hidden' },
   headerAccent: { position: 'absolute', top: -50, right: -50, width: 200, height: 200, borderRadius: 100, backgroundColor: 'rgba(255,255,255,0.05)' },
   logoContainer: { alignItems: 'center' },
-  iconBox: { width: 64, height: 64, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
+  logoImg: { width: 80, height: 80, marginBottom: 16 },
   brandTitle: { fontSize: 36, fontWeight: '900', color: '#FFFFFF', letterSpacing: -1 },
   brandSub: { fontSize: 16, color: '#A5B4FC', marginTop: 4, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 2 },
   formContainer: { flex: 1, paddingHorizontal: 20, marginTop: -40 },

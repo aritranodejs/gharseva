@@ -3,6 +3,11 @@
     "name": "gharseva-app",
     "slug": "gharseva-app",
     "version": "1.0.0",
+    "extra": {
+      "eas": {
+        "projectId": "85f6799b-640a-4298-967a-1158913693fb"
+      }
+    },
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",

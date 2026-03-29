@@ -16,6 +16,7 @@ class BookingRepository {
   async findById(id) {
     return await Booking.findById(id)
       .populate('serviceId')
+      .populate('userId', 'name profilePicture phoneNumber')
       .populate('assignedWorkerId', 'name profilePicture rating phoneNumber');
   }
 
@@ -23,7 +24,8 @@ class BookingRepository {
     return await Booking.find({
       assignedWorkerId: workerId,
       status: { $in: statuses }
-    }).populate('serviceId', 'name icon categoryId');
+    }).populate('serviceId', 'name icon categoryId')
+      .populate('userId', 'name profilePicture phoneNumber');
   }
 
   async updateStatus(id, status, workerId) {

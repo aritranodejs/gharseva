@@ -1,7 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const userController = require('../controllers/userController');
+const authController = require('../controllers/authController');
 const { protect } = require('../middleware/authMiddleware');
+const upload = require('../middleware/uploadMiddleware');
 
 /**
  * @route   POST /api/auth/send-otp
@@ -18,6 +20,20 @@ router.post('/send-otp', userController.sendOtp);
 router.post('/verify-otp', userController.verifyOtp);
 
 /**
+ * @route   POST /api/auth/refresh
+ * @desc    Refresh access token using refresh token
+ * @access  Public
+ */
+router.post('/refresh', authController.refresh);
+
+/**
+ * @route   POST /api/auth/logout
+ * @desc    Logout user and invalidate refresh token
+ * @access  Public
+ */
+router.post('/logout', authController.logout);
+
+/**
  * @route   GET /api/auth/profile
  * @desc    Get user profile
  * @access  Private
@@ -29,7 +45,7 @@ router.get('/profile', protect, userController.getProfile);
  * @desc    Update user profile
  * @access  Private
  */
-router.post('/profile', protect, userController.updateProfile);
+router.post('/profile', protect, upload.fields([{ name: 'profilePicture', maxCount: 1 }]), userController.updateProfile);
 
 /**
  * @route   POST /api/auth/addresses

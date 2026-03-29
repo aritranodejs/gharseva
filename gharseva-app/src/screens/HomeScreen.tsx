@@ -1,25 +1,53 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, TextInput, Dimensions, Modal, ActivityIndicator, Alert, StatusBar, RefreshControl } from 'react-native';
-import { Search, MapPin, Bell, Star, ChevronRight, ShieldCheck, Clock, Map, Navigation, X, ChevronDown, Sparkles, Check, Droplets, Zap, Hammer, Snowflake, Utensils, User } from 'lucide-react-native';
+import { Search, MapPin, Bell, Star, ChevronRight, ShieldCheck, Clock, Map, Navigation, X, ChevronDown, Sparkles, Check, Droplets, Zap, Hammer, Snowflake, Utensils, User, Heart, Wind } from 'lucide-react-native';
 import MapView, { Marker } from 'react-native-maps';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import api from '../services/api';
+import api, { getImageUrl } from '../services/api';
 import * as Location from 'expo-location';
 import PremiumToast from '../components/PremiumToast';
+import { io, Socket } from 'socket.io-client';
+import { Audio } from 'expo-av';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width } = Dimensions.get('window');
 
-// Banners will also ideally come from backend, but keeping for now as per minimal change requirement
+// Banners with NEW premium images
 const BANNERS = [
-  { id: '1', title: 'Home Deep Cleaning', off: 'UPTO 50% OFF', color: ['#4F46E5', '#818CF8'], image: 'https://img.freepik.com/free-photo/man-cleaning-house_23-2148890695.jpg' },
-  { id: '2', title: 'AC Servicing', off: 'STARTING @ ₹399', color: ['#059669', '#34D399'], image: 'https://img.freepik.com/free-vector/air-conditioner-repair-service-cartoon-flyer-template-web-banner_107791-23644.jpg' },
+  { id: '1', title: 'Home Deep Cleaning', off: 'UPTO 50% OFF', color: ['#4F46E5', '#818CF8'], image: require('../../assets/cleaning_premium.png') },
+  { id: '2', title: 'AC Servicing', off: 'STARTING @ ₹399', color: ['#059669', '#34D399'], image: require('../../assets/ac_premium.png') },
 ];
 
-// Helper to get Lucide icon by name
+// Pastel palette for premium category tiles
+const ICON_PALETTE: Record<string, { bg: string; iconColor: string }> = {
+  Sparkles:   { bg: '#F5F3FF', iconColor: '#8B5CF6' },
+  Droplets:   { bg: '#EFF6FF', iconColor: '#3B82F6' },
+  Zap:        { bg: '#FFF7ED', iconColor: '#F97316' },
+  Hammer:     { bg: '#FEF3C7', iconColor: '#D97706' },
+  Snowflake:  { bg: '#F0F9FF', iconColor: '#0EA5E9' },
+  ShieldCheck:{ bg: '#ECFDF5', iconColor: '#10B981' },
+  Utensils:   { bg: '#FFF1F2', iconColor: '#E11D48' },
+  Heart:      { bg: '#FFF1F2', iconColor: '#E11D48' },
+  Wind:       { bg: '#F0F9FF', iconColor: '#0EA5E9' },
+  User:       { bg: '#F5F3FF', iconColor: '#7C3AED' },
+};
+
+const getIconInfo = (iconName: string) => {
+  const map: any = {
+    Sparkles, Droplets, Zap, Hammer, Snowflake, ShieldCheck, User, Utensils, Heart, Wind,
+    sparkles: Sparkles, utensils: Utensils, wind: Wind, heart: Heart,
+    droplet: Droplets, '🛠️': Hammer, '❄️': Snowflake,
+    '🧹': Sparkles, '🧽': Droplets, '🔌': Zap, '🚿': Droplets, '🧴': ShieldCheck,
+  };
+  const key = Object.keys(ICON_PALETTE).find(k => k === iconName || k.toLowerCase() === iconName?.toLowerCase());
+  const palette = key ? ICON_PALETTE[key] : { bg: '#EEF2FF', iconColor: '#4F46E5' };
+  const IconComponent = map[iconName] || map[iconName?.toLowerCase()] || Hammer;
+  return { IconComponent, ...palette };
+};
+
 const getIcon = (iconName: string, size = 24, color = "#4F46E5") => {
-  const icons: any = { Zap, Droplets, Sparkles, Hammer, Snowflake, ShieldCheck, User, Utensils, Clock, Map, Navigation, ChevronRight, Star, Bell, Search, MapPin };
-  const IconComponent = icons[iconName] || Hammer;
+  const { IconComponent } = getIconInfo(iconName);
   return <IconComponent size={size} color={color} />;
 };
 
@@ -28,6 +56,7 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   
   const [services, setServices] = useState<any[]>([]);
+  const [popularServices, setPopularServices] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -44,11 +73,13 @@ export default function HomeScreen() {
     longitudeDelta: 0.05,
   });
   const [savedAddresses, setSavedAddresses] = useState<any[]>([]);
+  const [profilePic, setProfilePic] = useState<string | null>(null);
   const [pincodeSearch, setPincodeSearch] = useState('');
   
   const [toastVisible, setToastVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState<'success' | 'error' | 'info'>('info');
+  const socketRef = React.useRef<Socket | null>(null);
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     setToastMessage(message);
@@ -58,6 +89,42 @@ export default function HomeScreen() {
   
   const scrollRef = React.useRef<ScrollView>(null);
   const [currentSlide, setCurrentSlide] = useState(0);
+
+  useEffect(() => {
+    setupSocket();
+    return () => {
+      if (socketRef.current) socketRef.current.disconnect();
+    };
+  }, []);
+
+  const setupSocket = async () => {
+    const token = await AsyncStorage.getItem('userAccessToken');
+    if (!token) return;
+
+    const SOCKET_URL = api.defaults.baseURL?.replace('/api', '') || 'http://192.168.1.6:5000';
+    socketRef.current = io(SOCKET_URL, { auth: { token } });
+
+    socketRef.current.on('new_notification', async (notif: any) => {
+      // Short ping sound
+      try {
+        const { sound } = await Audio.Sound.createAsync(
+          { uri: 'https://actions.google.com/sounds/v1/alarms/beep_short.ogg' },
+          { shouldPlay: true }
+        );
+        setTimeout(() => sound.unloadAsync(), 3000);
+      } catch (e) {}
+      
+      showToast(notif.title, 'info');
+    });
+
+    socketRef.current.on('booking_confirmed', (data: any) => {
+      showToast(`${data.workerName} has accepted your booking!`, 'success');
+    });
+
+    socketRef.current.on('booking_status_update', (data: any) => {
+      showToast(`Booking status updated to ${data.status.replace('_', ' ')}`, 'info');
+    });
+  };
 
   useEffect(() => {
     let interval: any;
@@ -74,9 +141,11 @@ export default function HomeScreen() {
     return () => clearInterval(interval);
   }, [currentSlide]);
 
-  useEffect(() => {
-    fetchData();
-  }, [pincode]);
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchData();
+    }, [pincode])
+  );
 
   const fetchData = async () => {
     setLoading(true);
@@ -91,7 +160,12 @@ export default function HomeScreen() {
   const fetchSavedAddresses = async () => {
     try {
       const response = await api.get('auth/profile');
-      setSavedAddresses(response.data.data.addresses || []);
+      const profileData = response.data.data;
+      setSavedAddresses(profileData.addresses || []);
+      // Set profile picture from API
+      if (profileData.profilePicture) {
+        setProfilePic(getImageUrl(profileData.profilePicture));
+      }
     } catch (error) {
        console.error('Error fetching addresses for home:', error);
     }
@@ -109,8 +183,9 @@ export default function HomeScreen() {
   const fetchServices = async () => {
     try {
       const response = await api.get('services', { params: { pincode } });
-      const fetchedServices = response.data.data;
+       const fetchedServices = response.data.data;
       setServices(fetchedServices);
+      setPopularServices(fetchedServices.slice(0, 3));
       
       // Dynamic availability: If services are found for this pincode, it's available
       setIsAvailable(fetchedServices.length > 0);
@@ -349,7 +424,7 @@ export default function HomeScreen() {
         </View>
       </Modal>
       
-      {/* Premium Blinkit-style Header */}
+      {/* Premium Search-First Header (Urban Company Style) */}
       <View style={styles.header}>
         <View style={styles.headerTop}>
           <TouchableOpacity 
@@ -357,12 +432,9 @@ export default function HomeScreen() {
             onPress={() => setLocationModalVisible(true)}
             activeOpacity={0.7}
           >
-            <View style={styles.locIconBox}>
-               <MapPin size={22} color="#111827" />
-            </View>
             <View style={styles.locationTextWrapper}>
               <View style={styles.locLabelRow}>
-                <Text style={styles.deliveryStatusText}>Serviceable in 60 mins</Text>
+                <Text style={styles.deliveryStatusText}>Serviceable at</Text>
                 <ChevronDown size={14} color="#111827" style={{ marginLeft: 4 }} />
               </View>
               <Text style={styles.locationAddressText} numberOfLines={1}>{location}</Text>
@@ -371,16 +443,29 @@ export default function HomeScreen() {
           
           <TouchableOpacity style={styles.profileBtn} onPress={() => navigation.navigate('Profile')}>
             <View style={styles.profileIconWrapper}>
-              <User size={24} color="#111827" />
+               {profilePic ? (
+                 <Image source={{ uri: profilePic }} style={{ width: 44, height: 44, borderRadius: 22 }} />
+               ) : (
+                 <User size={24} color="#4F46E5" />
+               )}
             </View>
           </TouchableOpacity>
         </View>
 
-        {/* Premium Search Bar */}
+        {/* Premium Logo & Search Wrapper */}
+        <View style={styles.brandingRow}>
+           <Image source={require('../../assets/logo_premium.png')} style={styles.logoImg} resizeMode="contain" />
+           <Text style={styles.logoText}>GharSeva</Text>
+           <View style={styles.trustBadge}>
+              <ShieldCheck size={12} color="#10B981" />
+              <Text style={styles.trustText}>Verified</Text>
+           </View>
+        </View>
+
         <View style={styles.searchWrapper}>
           <TouchableOpacity style={styles.searchContainer} activeOpacity={0.9}>
             <Search size={22} color="#6B7280" />
-            <Text style={styles.searchPlaceholder}>Search "washing machine repair"</Text>
+            <Text style={styles.searchPlaceholder}>Search for "AC repair", "Cleaning"...</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -415,7 +500,7 @@ export default function HomeScreen() {
           >
             {BANNERS.map((banner) => (
               <TouchableOpacity key={banner.id} style={[styles.bannerCard, { backgroundColor: banner.color[0] }]} onPress={() => navigation.navigate('Packages' as any)}>
-                <Image source={{ uri: banner.image }} style={styles.bannerImage} resizeMode="cover" />
+                <Image source={banner.image} style={styles.bannerImage} resizeMode="cover" />
                 <View style={[styles.bannerOverlay, { backgroundColor: banner.color[0] + 'CC' }]} />
                 <View style={styles.bannerTextContainer}>
                   <Text style={styles.bannerOff}>{banner.off}</Text>
@@ -430,37 +515,57 @@ export default function HomeScreen() {
           </ScrollView>
         </View>
 
-        {/* Categories Grid */}
+        {/* Categories Grid - Premium Pastel Tiles (Urban Company Style) */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>What are you looking for?</Text>
         </View>
         <View style={styles.categoriesGrid}>
-          {categories.map((category) => (
-            <TouchableOpacity 
-              key={category._id} 
-              style={styles.categoryItem}
-              onPress={() => isAvailable ? navigation.navigate('CategoryServices', {
-                category,
-                pincode,
-                lat: mapRegion.latitude,
-                lng: mapRegion.longitude,
-                fullAddress: location
-              }) : showToast('We are not yet serving in this area.', 'info')}
-            >
-              <View style={[styles.categoryIconContainer, { backgroundColor: category.color }]}>
-                {getIcon(category.icon, 24, category.iconColor || "#4F46E5")}
-              </View>
-              <Text style={styles.categoryName} numberOfLines={1}>{category.name}</Text>
-            </TouchableOpacity>
-          ))}
+          {categories.map((category) => {
+            // Mapping for premium images
+            const categoryImages: any = {
+              'Cleaning': require('../../assets/cleaning_premium_v2.png'),
+              'AC Service': require('../../assets/ac_premium_v2.png'),
+              'Plumbing': require('../../assets/plumbing_premium_v2.png'),
+              'Electrician': require('../../assets/electrician_premium_v2.png'),
+              'Painting': require('../../assets/painting_premium.png'),
+              'Deep Cleaning': require('../../assets/cleaning_premium.png'),
+              'Household': require('../../assets/ac_premium.png')
+            };
+            const catImg = categoryImages[category.name] || categoryImages[Object.keys(categoryImages).find(k => category.name.includes(k)) || ''] || null;
+
+            return (
+              <TouchableOpacity 
+                key={category._id} 
+                style={styles.categoryItem}
+                onPress={() => isAvailable ? navigation.navigate('CategoryServices', {
+                  category,
+                  pincode,
+                  lat: mapRegion.latitude,
+                  lng: mapRegion.longitude,
+                  fullAddress: location
+                }) : showToast('We are not yet serving in this area.', 'info')}
+              >
+                <View style={styles.categoryIconContainer}>
+                  {catImg ? (
+                    <Image source={catImg} style={styles.categoryImgFull} />
+                  ) : (
+                    getIcon(category.icon, 30, category.iconColor || "#4F46E5")
+                  )}
+                </View>
+                <Text style={styles.categoryName} numberOfLines={2}>{category.name}</Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
-        {/* Premium Packages Banner */}
+        {/* Premium Packages Banner - UPDATED with luxury image */}
         <TouchableOpacity 
            style={styles.packageBanner}
            activeOpacity={0.9}
            onPress={() => navigation.navigate('Packages' as any)}
         >
+           <Image source={require('../../assets/cleaning_premium_v2.png')} style={styles.packageBannerBg} />
+           <View style={styles.packageBannerOverlay} />
            <View style={styles.pkgBannerTextGroup}>
               <View style={styles.pkgBadge}>
                  <Star size={12} color="#FFF" fill="#FFF" />
@@ -468,71 +573,117 @@ export default function HomeScreen() {
               </View>
               <Text style={styles.pkgBannerTitle}>Household Packages</Text>
               <Text style={styles.pkgBannerSub}>Cleaning • Laundry • Dishes</Text>
-              <Text style={styles.pkgBannerAction}>View Subscription Plans <ChevronRight size={14} color="#6366F1" /></Text>
+              <Text style={styles.pkgBannerAction}>View Subscription Plans <ChevronRight size={14} color="#FFF" /></Text>
            </View>
-           <Text style={styles.pkgBannerEmoji}>📦</Text>
         </TouchableOpacity>
 
-        {/* Recommended Services */}
+        {/* Recommended Services - Premium Horizontal Cards */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Recommended for you</Text>
-          <TouchableOpacity><Text style={styles.seeAll}>See All</Text></TouchableOpacity>
+          <TouchableOpacity onPress={() => navigation.navigate('Packages' as any)}>
+            <Text style={styles.seeAll}>See All</Text>
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false} 
+          contentContainerStyle={styles.recListContent}
+        >
+          {popularServices.map((service) => (
+            <TouchableOpacity 
+              key={service._id} 
+              style={styles.recCard}
+              onPress={() => isAvailable ? navigation.navigate('ServiceDetail', {
+                service,
+                pincode,
+                lat: mapRegion.latitude,
+                lng: mapRegion.longitude,
+                fullAddress: location
+              }) : showToast('We are not yet serving in this area.', 'info')}
+            >
+              <Image source={{ uri: service.image }} style={styles.recCardImg} resizeMode="cover" />
+              <View style={styles.recCardOverlay} />
+              <View style={styles.recCardContent}>
+                 <View style={styles.recBadge}>
+                    <Sparkles size={10} color="#FFF" />
+                    <Text style={styles.recBadgeText}>POPULAR</Text>
+                 </View>
+                 <Text style={styles.recTitle} numberOfLines={2}>{service.name}</Text>
+                 <View style={styles.recFooter}>
+                    <Text style={styles.recPrice}>₹{service.basePrice || service.price}</Text>
+                    <View style={styles.recRating}>
+                       <Star size={10} color="#FFD700" fill="#FFD700" />
+                       <Text style={styles.recRatingText}>{service.rating || '4.8'}</Text>
+                    </View>
+                 </View>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        {/* All Services List */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Full Service Menu</Text>
         </View>
 
         {loading ? (
           <ActivityIndicator size="large" color="#4F46E5" style={{ marginTop: 40 }} />
         ) : (
           <View style={styles.servicesList}>
-            {services.map((service) => (
-              <TouchableOpacity 
-                key={service._id} 
-                style={[styles.serviceCard, !isAvailable && { opacity: 0.6 }]}
-                onPress={() => isAvailable ? navigation.navigate('ServiceDetail', {
-                  service,
-                  pincode,
-                  lat: mapRegion.latitude,
-                  lng: mapRegion.longitude,
-                  fullAddress: location
-                }) : showToast('We are not yet serving in this area.', 'info')}
-              >
-                <View style={styles.cardMain}>
-                  <View style={styles.serviceTextInfo}>
-                    <View style={styles.serviceHeaderRow}>
-                       <View style={styles.ratingBox}>
-                          <Star size={10} color="#FFFFFF" fill="#FFFFFF" />
-                          <Text style={styles.ratingVal}>{service.rating}</Text>
-                       </View>
-                       <Text style={styles.reviewsVal}>({service.reviewsCount} reviews)</Text>
+            {services.map((service) => {
+              const { IconComponent: SvcIcon, bg: svcBg, iconColor: svcColor } = getIconInfo(service.icon);
+              return (
+                <TouchableOpacity
+                  key={service._id}
+                  style={[styles.serviceCard, !isAvailable && { opacity: 0.6 }]}
+                  onPress={() => isAvailable ? navigation.navigate('ServiceDetail', {
+                    service,
+                    pincode,
+                    lat: mapRegion.latitude,
+                    lng: mapRegion.longitude,
+                    fullAddress: location
+                  }) : showToast('We are not yet serving in this area.', 'info')}
+                >
+                  <View style={styles.cardMain}>
+                    <View style={styles.serviceTextInfo}>
+                      <View style={styles.serviceHeaderRow}>
+                         <View style={styles.ratingBox}>
+                            <Star size={10} color="#FFFFFF" fill="#FFFFFF" />
+                            <Text style={styles.ratingVal}>{service.rating}</Text>
+                         </View>
+                         <Text style={styles.reviewsVal}>({service.reviewsCount} reviews)</Text>
+                      </View>
+                      <Text style={styles.serviceTitleText}>{service.name}</Text>
+                      <View style={styles.metaRow}>
+                         <Clock size={12} color="#6B7280" />
+                         <Text style={styles.metaText}>{service.duration || '60 mins'}</Text>
+                         <View style={styles.metaDot} />
+                         <ShieldCheck size={12} color="#10B981" />
+                         <Text style={styles.metaTextGreen}>Guaranteed</Text>
+                      </View>
+                      <View style={styles.priceContainer}>
+                         <Text style={styles.priceStart}>Starts from</Text>
+                         <Text style={styles.priceVal}>₹{service.basePrice || service.price}</Text>
+                      </View>
                     </View>
-                    <Text style={styles.serviceTitleText}>{service.name}</Text>
-                    <View style={styles.metaRow}>
-                       <Clock size={12} color="#6B7280" />
-                       <Text style={styles.metaText}>{service.duration || '60 mins'}</Text>
-                       <View style={styles.metaDot} />
-                       <ShieldCheck size={12} color="#10B981" />
-                       <Text style={styles.metaTextGreen}>Guaranteed</Text>
-                    </View>
-                    <View style={styles.priceContainer}>
-                       <Text style={styles.priceStart}>Starts from</Text>
-                       <Text style={styles.priceVal}>₹{service.basePrice || service.price}</Text>
+                    <View style={styles.serviceImgWrapper}>
+                      <View style={[styles.emojiBack, { backgroundColor: svcBg }]}>
+                         <SvcIcon size={36} color={svcColor} />
+                      </View>
+                      <TouchableOpacity
+                        style={[styles.addBtn, !isAvailable && { backgroundColor: '#D1D5DB' }]}
+                        onPress={() => isAvailable ? navigation.navigate('ServiceDetail', {
+                          service: service
+                        }) : null}
+                      >
+                        <Text style={styles.addBtnText}>ADD</Text>
+                      </TouchableOpacity>
                     </View>
                   </View>
-                  <View style={styles.serviceImgWrapper}>
-                    <View style={styles.emojiBack}>
-                       <Text style={styles.serviceEmojiAbs}>{service.icon || '🛠️'}</Text>
-                    </View>
-                    <TouchableOpacity 
-                      style={[styles.addBtn, !isAvailable && { backgroundColor: '#D1D5DB' }]}
-                      onPress={() => isAvailable ? navigation.navigate('ServiceDetail', {
-                        service: service
-                      }) : null}
-                    >
-                      <Text style={styles.addBtnText}>ADD</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </TouchableOpacity>
-            ))}
+                </TouchableOpacity>
+              );
+            })}
           </View>
         )}
         <View style={{ height: 100 }} />
@@ -549,62 +700,79 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FAFB' },
-  header: { backgroundColor: '#FFD700', paddingHorizontal: 16, paddingBottom: 16 }, // Blinkit yellow
+  container: { flex: 1, backgroundColor: '#FFFFFF' },
+  header: { backgroundColor: '#FFFFFF', paddingHorizontal: 16, paddingBottom: 20, borderBottomLeftRadius: 30, borderBottomRightRadius: 30, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.05, shadowRadius: 15, elevation: 10, zIndex: 100 },
   headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 },
-  locationContainer: { flexDirection: 'row', alignItems: 'center', flex: 1, backgroundColor: 'rgba(255,255,255,0.3)', padding: 8, borderRadius: 12 },
+  locationContainer: { flexDirection: 'row', alignItems: 'center', flex: 1, padding: 4 },
   locIconBox: { width: 32, height: 32, justifyContent: 'center', alignItems: 'center' },
-  locationTextWrapper: { marginLeft: 8, flex: 1 },
+  locationTextWrapper: { flex: 1 },
   locLabelRow: { flexDirection: 'row', alignItems: 'center' },
-  deliveryStatusText: { fontSize: 13, fontWeight: '900', color: '#111827' },
-  locationAddressText: { fontSize: 12, color: '#111827', fontWeight: '500', opacity: 0.8 },
+  deliveryStatusText: { fontSize: 12, fontWeight: '700', color: '#6B7280', textTransform: 'uppercase', letterSpacing: 0.5 },
+  locationAddressText: { fontSize: 15, color: '#111827', fontWeight: '900', marginTop: 1 },
+  brandingRow: { flexDirection: 'row', alignItems: 'center', marginTop: 20 },
+  logoImg: { width: 44, height: 44 },
+  logoText: { fontSize: 24, fontWeight: '900', color: '#1F2937', marginLeft: 12, letterSpacing: -1 },
+  trustBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ECFDF5', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, marginLeft: 12 },
+  trustText: { fontSize: 10, fontWeight: '800', color: '#059669', marginLeft: 4, textTransform: 'uppercase' },
   profileBtn: { marginLeft: 12 },
-  profileIconWrapper: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#FFFFFF', justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 },
-  searchWrapper: { marginTop: 16 },
-  searchContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 12, paddingHorizontal: 16, height: 50, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 },
-  searchPlaceholder: { marginLeft: 10, fontSize: 15, color: '#6B7280', flex: 1 },
-  scrollContent: { paddingTop: 16 },
+  profileIconWrapper: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#F3F4F6', justifyContent: 'center', alignItems: 'center' },
+  searchWrapper: { marginTop: 20 },
+  searchContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F9FAFB', borderRadius: 16, paddingHorizontal: 16, height: 56, borderWidth: 1, borderColor: '#F3F4F6' },
+  searchPlaceholder: { marginLeft: 12, fontSize: 15, color: '#9CA3AF', fontWeight: '500', flex: 1 },
+  scrollContent: { paddingTop: 24 },
   availabilityBanner: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FEF2F2', marginHorizontal: 16, padding: 12, borderRadius: 12, marginBottom: 16 },
   availabilityText: { marginLeft: 8, fontSize: 12, color: '#B91C1C', fontWeight: '600' },
-  bannerContainer: { marginBottom: 24 },
-  bannerCard: { width: width - 40, height: 180, borderRadius: 28, marginRight: 12, overflow: 'hidden', padding: 24, position: 'relative' },
-  bannerImage: { ...StyleSheet.absoluteFillObject },
+  bannerContainer: { marginBottom: 32, height: 200 },
+  bannerCard: { width: width - 32, height: 190, borderRadius: 32, marginRight: 16, overflow: 'hidden', position: 'relative' },
+  bannerImage: { width: '100%', height: '100%' },
   bannerOverlay: { ...StyleSheet.absoluteFillObject },
-  bannerTextContainer: { flex: 1, justifyContent: 'center', zIndex: 10 },
-  bannerOff: { color: '#FFFFFF', fontSize: 13, fontWeight: '900', backgroundColor: 'rgba(255,255,255,0.2)', alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, overflow: 'hidden', marginBottom: 12 },
-  bannerTitle: { color: '#FFFFFF', fontSize: 26, fontWeight: '900', marginBottom: 24, textShadowColor: 'rgba(0,0,0,0.2)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4 },
-  bookNowBtn: { backgroundColor: '#FFFFFF', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 16, alignSelf: 'flex-start', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 3 },
-  bookNowText: { color: '#111827', fontWeight: '900', fontSize: 14 },
-  bannerIconAbs: { position: 'absolute', right: -10, bottom: -10, opacity: 0.4 },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, marginBottom: 16 },
-  sectionTitle: { fontSize: 18, fontWeight: '800', color: '#111827' },
-  seeAll: { color: '#4F46E5', fontWeight: '700' },
-  categoriesGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 8, marginBottom: 24 },
-  categoryItem: { width: '25%', alignItems: 'center', marginBottom: 20 },
-  categoryIconContainer: { width: 64, height: 64, borderRadius: 22, justifyContent: 'center', alignItems: 'center', marginBottom: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.03, shadowRadius: 5, elevation: 2 },
-  categoryEmoji: { fontSize: 28 },
-  categoryName: { fontSize: 11, color: '#374151', fontWeight: '600' },
-  servicesList: { paddingHorizontal: 16 },
-  serviceCard: { backgroundColor: '#FFFFFF', borderRadius: 24, marginBottom: 16, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 3 },
+  bannerTextContainer: { position: 'absolute', left: 24, top: 0, bottom: 0, justifyContent: 'center', zIndex: 10, width: '60%' },
+  bannerOff: { color: '#FFFFFF', fontSize: 11, fontWeight: '900', backgroundColor: 'rgba(255,255,255,0.25)', alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, overflow: 'hidden', marginBottom: 10, textTransform: 'uppercase' },
+  bannerTitle: { color: '#FFFFFF', fontSize: 28, fontWeight: '900', marginBottom: 20, lineHeight: 32 },
+  bookNowBtn: { backgroundColor: '#FFFFFF', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12, alignSelf: 'flex-start', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 3 },
+  bookNowText: { color: '#4F46E5', fontWeight: '900', fontSize: 13 },
+  bannerIconAbs: { position: 'absolute', right: -20, bottom: -20, opacity: 0.2 },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginBottom: 20 },
+  sectionTitle: { fontSize: 20, fontWeight: '900', color: '#111827' },
+  seeAll: { color: '#4F46E5', fontWeight: '800', fontSize: 14 },
+  categoriesGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 12, marginBottom: 32 },
+  categoryItem: { width: '25%', alignItems: 'center', marginBottom: 28, paddingHorizontal: 4 },
+  categoryIconContainer: { width: 68, height: 68, borderRadius: 22, justifyContent: 'center', alignItems: 'center', marginBottom: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 3, overflow: 'hidden' },
+  categoryImgFull: { width: '100%', height: '100%' },
+  categoryName: { fontSize: 11, color: '#1F2937', fontWeight: '700', textAlign: 'center', lineHeight: 15 },
+  servicesList: { paddingHorizontal: 20 },
+  recListContent: { paddingLeft: 20, paddingBottom: 32 },
+  recCard: { width: 160, height: 220, borderRadius: 24, marginRight: 16, overflow: 'hidden', backgroundColor: '#F3F4F6' },
+  recCardImg: { width: '100%', height: '100%' },
+  recCardOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.3)' },
+  recCardContent: { position: 'absolute', bottom: 16, left: 16, right: 16 },
+  recBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.2)', alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, marginBottom: 8 },
+  recBadgeText: { color: '#FFF', fontSize: 9, fontWeight: '900', marginLeft: 4 },
+  recTitle: { fontSize: 16, fontWeight: '900', color: '#FFF', marginBottom: 8, lineHeight: 20 },
+  recFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  recPrice: { fontSize: 16, fontWeight: '900', color: '#FFF' },
+  recRating: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.4)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+  recRatingText: { color: '#FFF', fontSize: 10, fontWeight: '900', marginLeft: 3 },
+  serviceCard: { backgroundColor: '#FFFFFF', borderRadius: 32, marginBottom: 20, padding: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.04, shadowRadius: 20, elevation: 5, borderWidth: 1, borderColor: '#F3F4F6' },
   cardMain: { flexDirection: 'row', justifyContent: 'space-between' },
   serviceTextInfo: { flex: 1, marginRight: 16 },
-  serviceHeaderRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
-  ratingBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#10B981', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, marginRight: 8 },
-  ratingVal: { color: '#FFFFFF', fontSize: 11, fontWeight: 'bold', marginLeft: 2 },
-  reviewsVal: { fontSize: 11, color: '#6B7280' },
-  serviceTitleText: { fontSize: 17, fontWeight: 'bold', color: '#111827', marginBottom: 8 },
-  metaRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
-  metaText: { fontSize: 12, color: '#6B7280', marginLeft: 4 },
-  metaDot: { width: 3, height: 3, borderRadius: 1.5, backgroundColor: '#D1D5DB', marginHorizontal: 6 },
-  metaTextGreen: { fontSize: 12, color: '#10B981', fontWeight: 'bold', marginLeft: 4 },
-  priceContainer: { flexDirection: 'row', alignItems: 'center' },
-  priceStart: { fontSize: 12, color: '#6B7280', marginRight: 6 },
-  priceVal: { fontSize: 20, fontWeight: '900', color: '#111827' },
-  serviceImgWrapper: { width: 100, height: 100, alignItems: 'center', justifyContent: 'center' },
-  emojiBack: { width: 100, height: 100, borderRadius: 20, backgroundColor: '#F9FAFB', justifyContent: 'center', alignItems: 'center' },
-  serviceEmojiAbs: { fontSize: 44 },
-  addBtn: { position: 'absolute', bottom: -5, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#4F46E5', paddingHorizontal: 20, paddingVertical: 6, borderRadius: 10, shadowColor: '#4F46E5', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 2 },
-  addBtnText: { color: '#4F46E5', fontWeight: '900', fontSize: 13 },
+  serviceHeaderRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+  ratingBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#059669', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, marginRight: 10 },
+  ratingVal: { color: '#FFFFFF', fontSize: 12, fontWeight: '900', marginLeft: 3 },
+  reviewsVal: { fontSize: 12, color: '#9CA3AF', fontWeight: '600' },
+  serviceTitleText: { fontSize: 19, fontWeight: '900', color: '#111827', marginBottom: 10 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
+  metaText: { fontSize: 13, color: '#6B7280', marginLeft: 5, fontWeight: '600' },
+  metaDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: '#D1D5DB', marginHorizontal: 8 },
+  metaTextGreen: { fontSize: 13, color: '#059669', fontWeight: '800', marginLeft: 5 },
+  priceContainer: { flexDirection: 'row', alignItems: 'baseline' },
+  priceStart: { fontSize: 13, color: '#9CA3AF', marginRight: 6, fontWeight: '600' },
+  priceVal: { fontSize: 22, fontWeight: '900', color: '#111827' },
+  serviceImgWrapper: { width: 110, height: 110, alignItems: 'center', justifyContent: 'center' },
+  emojiBack: { width: 110, height: 110, borderRadius: 28, backgroundColor: '#F9FAFB', justifyContent: 'center', alignItems: 'center' },
+  serviceEmojiAbs: { fontSize: 48 },
+  addBtn: { position: 'absolute', bottom: -8, backgroundColor: '#FFFFFF', borderWidth: 1.5, borderColor: '#4F46E5', paddingHorizontal: 24, paddingVertical: 8, borderRadius: 14, shadowColor: '#4F46E5', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 4 },
+  addBtnText: { color: '#4F46E5', fontWeight: '900', fontSize: 14 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   modalContainer: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 36, borderTopRightRadius: 36, padding: 24, maxHeight: '80%' },
   modalHandle: { width: 40, height: 5, backgroundColor: '#E5E7EB', borderRadius: 3, alignSelf: 'center', marginBottom: 20 },
@@ -633,13 +801,15 @@ const styles = StyleSheet.create({
   confirmMapText: { color: '#FFFFFF', fontWeight: 'bold', marginLeft: 10, fontSize: 16 },
   closeMapBtn: { position: 'absolute', top: 20, right: 20, backgroundColor: '#FFFFFF', width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 5, elevation: 4 },
   noAddressText: { fontSize: 13, color: '#9CA3AF', fontStyle: 'italic', marginTop: 8 },
-  packageBanner: { marginHorizontal: 20, marginBottom: 32, backgroundColor: '#EEF2FF', borderRadius: 24, padding: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: '#E0E7FF' },
-  pkgBannerTextGroup: { flex: 1 },
-  pkgBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#4F46E5', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, alignSelf: 'flex-start', marginBottom: 12 },
+  packageBanner: { marginHorizontal: 20, marginBottom: 32, borderRadius: 32, padding: 24, flexDirection: 'row', alignItems: 'center', overflow: 'hidden', height: 160 },
+  packageBannerBg: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
+  packageBannerOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)' },
+  pkgBannerTextGroup: { flex: 1, zIndex: 10 },
+  pkgBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#4F46E5', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, alignSelf: 'flex-start', marginBottom: 12 },
   pkgBadgeText: { color: '#FFF', fontSize: 10, fontWeight: '900', letterSpacing: 1, marginLeft: 4 },
-  pkgBannerTitle: { fontSize: 22, fontWeight: '900', color: '#111827', marginBottom: 4 },
-  pkgBannerSub: { fontSize: 13, color: '#4B5563', fontWeight: '600', marginBottom: 12 },
-  pkgBannerAction: { fontSize: 14, fontWeight: '800', color: '#6366F1', flexDirection: 'row', alignItems: 'center' },
+  pkgBannerTitle: { fontSize: 24, fontWeight: '900', color: '#FFF', marginBottom: 4 },
+  pkgBannerSub: { fontSize: 13, color: 'rgba(255,255,255,0.8)', fontWeight: '600', marginBottom: 12 },
+  pkgBannerAction: { fontSize: 14, fontWeight: '800', color: '#FFF', flexDirection: 'row', alignItems: 'center' },
   pkgBannerEmoji: { fontSize: 44, marginLeft: 16 },
   pincodeSearchWrapper: { flexDirection: 'row', alignItems: 'center', marginBottom: 20, backgroundColor: '#F9FAFB', borderRadius: 20, padding: 8, borderWidth: 1, borderColor: '#F3F4F6' },
   pincodeInput: { flex: 1, height: 48, paddingHorizontal: 16, fontSize: 16, color: '#111827', fontWeight: '600' },

@@ -1,5 +1,5 @@
 const workerRepository = require('../repositories/workerRepository');
-const { generateToken } = require('../utils/auth');
+const { generateTokens } = require('../utils/auth');
 
 class WorkerService {
   async authenticate(phoneNumber, password) {
@@ -18,9 +18,12 @@ class WorkerService {
       throw new Error('Your application was rejected by the admin.');
     }
 
-    const token = generateToken(worker._id, 'worker');
+    const tokens = generateTokens(worker._id, 'worker');
+    const tokenStore = require('../utils/tokenStore');
+    await tokenStore.set(`rf_${tokens.refreshToken}`, worker._id.toString(), 7 * 24 * 60 * 60); // 7 days
+
     return {
-      token,
+      ...tokens,
       worker: {
         _id: worker._id,
         name: worker.name,

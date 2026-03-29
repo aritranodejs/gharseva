@@ -2,9 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Image, ActivityIndicator, Alert, Modal, StatusBar } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
-import { Camera, ShieldCheck, MapPin, Star, Phone, ArrowLeft, Check, X, LogOut, Briefcase, FileText } from 'lucide-react-native';
+import { Camera, ShieldCheck, MapPin, Star, Phone, ArrowLeft, Check, X, LogOut, Briefcase, FileText, ChevronRight, HelpCircle } from 'lucide-react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import api, { getImageUrl } from '../services/api';
+import PremiumToast from '../components/PremiumToast';
 
 const EMOJI_MAP: Record<string, string> = {
   'sparkles': '🧺',
@@ -23,7 +25,8 @@ const EMOJI_MAP: Record<string, string> = {
   'house': '🏠'
 };
 
-export default function ProfileScreen() {
+export default function ProfileScreen(props: any) {
+  const { onLogout } = props;
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const [profile, setProfile] = useState<any>(null);
@@ -41,6 +44,16 @@ export default function ProfileScreen() {
   const [allCategories, setAllCategories] = useState<any[]>([]);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
+
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastType, setToastType] = useState<'success' | 'error' | 'info'>('info');
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setToastMessage(message);
+    setToastType(type);
+    setToastVisible(true);
+  };
 
   useEffect(() => {
     fetchProfile();
@@ -139,13 +152,13 @@ export default function ProfileScreen() {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       
-      Alert.alert('Success', 'Profile updated successfully.');
+      showToast('Profile updated successfully!', 'success');
       fetchProfile();
       setNewAvatar(null);
       setNewAadhaarImage(null);
       setNewPanImage(null);
     } catch (err: any) {
-      Alert.alert('Error', err.response?.data?.message || 'Failed to update profile.');
+      showToast(err.response?.data?.message || 'Failed to update profile.', 'error');
     } finally {
        setSaving(false);
     }
@@ -205,7 +218,7 @@ export default function ProfileScreen() {
                </View>
                <View style={styles.verticalDivider} />
                <View style={styles.statBox}>
-                  <Text style={styles.statValue}>{profile?.activeBookingsCount || 0}</Text>
+                  <Text style={styles.statValue}>{Math.max(0, profile?.activeBookingsCount || 0)}</Text>
                   <Text style={styles.statLabel}>Active</Text>
                </View>
                <View style={styles.verticalDivider} />
@@ -375,6 +388,46 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Section: Support & Legal */}
+        <View style={styles.section}>
+           <Text style={styles.sectionTitleLegal}>Support & Legal</Text>
+           <View style={styles.legalLinksRow}>
+              <TouchableOpacity style={styles.legalItem} onPress={() => navigation.navigate('Help')}>
+                 <View style={[styles.legalIconBack, { backgroundColor: '#EEF2FF' }]}>
+                    <HelpCircle size={20} color="#4F46E5" />
+                 </View>
+                 <Text style={styles.legalItemText}>Help Center</Text>
+                 <ChevronRight size={18} color="#9CA3AF" />
+              </TouchableOpacity>
+              
+              <TouchableOpacity style={styles.legalItem} onPress={() => navigation.navigate('Privacy')}>
+                 <View style={[styles.legalIconBack, { backgroundColor: '#ECFDF5' }]}>
+                    <ShieldCheck size={20} color="#10B981" />
+                 </View>
+                 <Text style={styles.legalItemText}>Privacy & Terms</Text>
+                 <ChevronRight size={18} color="#9CA3AF" />
+              </TouchableOpacity>
+           </View>
+        </View>
+
+        {/* Logout Button */}
+        <TouchableOpacity style={styles.logoutRow} onPress={async () => {
+             const refreshToken = await AsyncStorage.getItem('workerRefreshToken');
+             if (refreshToken) {
+               try {
+                 await api.post('/auth/logout', { refreshToken });
+               } catch (e) { /* ignore */ }
+             }
+             await AsyncStorage.multiRemove(['workerAccessToken', 'workerRefreshToken', 'workerData']);
+             if (onLogout) onLogout();
+             else showToast('Successfully signed out.', 'success');
+        }}>
+           <View style={styles.logoutIconBack}>
+             <LogOut size={20} color="#EF4444" />
+           </View>
+           <Text style={styles.logoutText}>Sign Out from Platform</Text>
+        </TouchableOpacity>
+
         <View style={{ height: 40 }} />
       </ScrollView>
 
@@ -417,6 +470,13 @@ export default function ProfileScreen() {
             </View>
          </View>
       </Modal>
+
+      <PremiumToast 
+        visible={toastVisible} 
+        message={toastMessage} 
+        type={toastType} 
+        onHide={() => setToastVisible(false)} 
+      />
     </View>
   );
 }
@@ -488,6 +548,16 @@ const styles = StyleSheet.create({
   
   saveButton: { backgroundColor: '#4F46E5', borderRadius: 20, height: 64, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 10, shadowColor: '#4F46E5', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 8 },
   buttonText: { color: '#FFF', fontSize: 17, fontWeight: '900' },
+
+  sectionTitleLegal: { fontSize: 13, fontWeight: '900', color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 16, marginLeft: 4 },
+  legalLinksRow: { gap: 12 },
+  legalItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F9FAFB', padding: 16, borderRadius: 20, borderWidth: 1, borderColor: '#F3F4F6' },
+  legalIconBack: { width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginRight: 14 },
+  legalItemText: { flex: 1, fontSize: 15, fontWeight: '800', color: '#1F2937' },
+
+  logoutRow: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 20, marginTop: 32, marginBottom: 60, padding: 20, backgroundColor: '#FEF2F2', borderRadius: 24, borderWidth: 1, borderColor: '#FEE2E2' },
+  logoutIconBack: { width: 44, height: 44, borderRadius: 14, backgroundColor: '#FFF', justifyContent: 'center', alignItems: 'center', marginRight: 16, shadowColor: '#EF4444', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 },
+  logoutText: { fontSize: 16, fontWeight: '900', color: '#EF4444' },
 
   modalOverlay: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.7)', justifyContent: 'flex-end' },
   modalContent: { backgroundColor: '#FFF', borderTopLeftRadius: 40, borderTopRightRadius: 40, padding: 32, maxHeight: '85%' },

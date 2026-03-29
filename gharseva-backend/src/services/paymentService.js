@@ -32,10 +32,12 @@ class PaymentService {
   }
 
   async addMethod(userId, methodData) {
-    const { type, identifier, cardNumber } = methodData;
+    let { type, identifier, cardNumber } = methodData;
 
     if (type === 'card' && cardNumber) {
       if (!this.isValidCard(cardNumber)) throw new Error('Invalid card number (LUHN check failed)');
+      // Securely store the actual card number, it will be encrypted by the repository
+      identifier = cardNumber;
     }
 
     const exists = await paymentRepository.findByIdentifier(userId, identifier);
@@ -44,6 +46,7 @@ class PaymentService {
     return await paymentRepository.create({
       userId,
       ...methodData,
+      identifier,
       last4: type === 'card' ? cardNumber.slice(-4) : methodData.last4
     });
   }

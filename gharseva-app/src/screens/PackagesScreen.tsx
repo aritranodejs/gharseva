@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar, ActivityIndicator, Alert, TextInput, KeyboardAvoidingView, Platform, Modal } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar, ActivityIndicator, Alert, TextInput, KeyboardAvoidingView, Platform, Modal, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft, Package as PackageIcon, CheckCircle2, ShieldCheck, CreditCard, Zap, ChevronRight, MapPin } from 'lucide-react-native';
 import api from '../services/api';
@@ -135,7 +135,13 @@ export default function PackagesScreen({ navigation }: Props) {
           <View style={styles.pkgCard}>
             <View style={styles.pkgHeader}>
                <View style={styles.pkgIconBox}>
-                  <Text style={styles.pkgIconBigger}>{selectedPkg.icon}</Text>
+                  {selectedPkg.name.toLowerCase().includes('cleaning') ? (
+                    <Image source={require('../../assets/cleaning_premium_v2.png')} style={styles.pkgImgHeader} />
+                  ) : selectedPkg.name.toLowerCase().includes('ac') ? (
+                    <Image source={require('../../assets/ac_premium_v2.png')} style={styles.pkgImgHeader} />
+                  ) : (
+                    <Text style={styles.pkgIconBigger}>{selectedPkg.icon}</Text>
+                  )}
                </View>
                <View style={styles.pkgTitleBox}>
                   <Text style={styles.pkgName}>{selectedPkg.name}</Text>
@@ -334,8 +340,9 @@ const styles = StyleSheet.create({
   
   pkgCard: { backgroundColor: '#F9FAFB', borderRadius: 24, padding: 20, borderWidth: 1, borderColor: '#F3F4F6' },
   pkgHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
-  pkgIconBox: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#EEF2FF', justifyContent: 'center', alignItems: 'center', marginRight: 16 },
-  pkgIconBigger: { fontSize: 28 },
+  pkgIconBox: { width: 80, height: 80, borderRadius: 20, backgroundColor: '#EEF2FF', justifyContent: 'center', alignItems: 'center', marginRight: 16, overflow: 'hidden' },
+  pkgImgHeader: { width: '100%', height: '100%' },
+  pkgIconBigger: { fontSize: 32 },
   pkgTitleBox: { flex: 1 },
   pkgName: { fontSize: 22, fontWeight: '900', color: '#111827', marginBottom: 6 },
   badgeBundle: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#4F46E5', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, alignSelf: 'flex-start' },

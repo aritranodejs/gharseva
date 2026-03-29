@@ -89,4 +89,11 @@ router.post('/location', protectWorker, workerController.updateLocation);
  */
 router.patch('/bookings/:id/cancel', protectWorker, bookingController.cancel);
 
+/**
+ * @route   POST /api/workers/push-token
+ * @desc    Save worker's Expo push token for remote notifications
+ * @access  Private (Worker)
+ */
+router.post('/push-token', protectWorker, workerController.savePushToken);
+
 module.exports = router;

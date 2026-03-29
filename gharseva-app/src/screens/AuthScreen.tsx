@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator, Dimensions, StatusBar, ScrollView, Animated } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator, Dimensions, StatusBar, ScrollView, Animated, Image } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { RootStackParamList } from '../navigation/AppNavigator';
@@ -25,12 +25,20 @@ export default function AuthScreen({ navigation }: Props) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    checkToken();
     Animated.timing(fadeAnim, {
       toValue: 1,
       duration: 800,
       useNativeDriver: true,
     }).start();
   }, [step]);
+
+  const checkToken = async () => {
+    const token = await AsyncStorage.getItem('userAccessToken');
+    if (token) {
+      navigation.replace('Main');
+    }
+  };
 
   useFocusEffect(
     React.useCallback(() => {
@@ -62,8 +70,12 @@ export default function AuthScreen({ navigation }: Props) {
     setError('');
     try {
       const response = await api.post('auth/verify-otp', { phoneNumber, otp });
-      await AsyncStorage.setItem('userToken', response.data.data.token);
-      await AsyncStorage.setItem('userId', response.data.data._id);
+      const { accessToken, refreshToken, ...user } = response.data.data;
+      
+      await AsyncStorage.setItem('userAccessToken', accessToken);
+      await AsyncStorage.setItem('userRefreshToken', refreshToken);
+      await AsyncStorage.setItem('userId', user._id);
+      await AsyncStorage.setItem('userData', JSON.stringify(user));
       navigation.replace('Main');
     } catch (err: any) {
       setError(err.response?.data?.message || 'Invalid OTP');
@@ -84,9 +96,7 @@ export default function AuthScreen({ navigation }: Props) {
         <View style={[styles.headerGraphic, { height: height * 0.35 }]}>
           <View style={styles.headerAccent} />
           <View style={styles.logoContainer}>
-            <View style={styles.iconBox}>
-               <Zap size={32} color="#FFFFFF" fill="#FFFFFF" />
-            </View>
+            <Image source={require('../../assets/logo_premium.png')} style={styles.logoImg} resizeMode="contain" />
             <Text style={styles.brandTitle}>GharSeva</Text>
             <Text style={styles.brandSub}>Quality Home Services, Instantly</Text>
           </View>
@@ -200,7 +210,7 @@ const styles = StyleSheet.create({
   headerGraphic: { backgroundColor: '#4F46E5', justifyContent: 'center', alignItems: 'center', borderBottomLeftRadius: 40, borderBottomRightRadius: 40, overflow: 'hidden' },
   headerAccent: { position: 'absolute', top: -50, right: -50, width: 200, height: 200, borderRadius: 100, backgroundColor: 'rgba(255,255,255,0.1)' },
   logoContainer: { alignItems: 'center' },
-  iconBox: { width: 64, height: 64, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
+  logoImg: { width: 80, height: 80, marginBottom: 16 },
   brandTitle: { fontSize: 36, fontWeight: '900', color: '#FFFFFF', letterSpacing: -1 },
   brandSub: { fontSize: 14, color: 'rgba(255,255,255,0.8)', marginTop: 4, fontWeight: '500' },
   formContainer: { flex: 1, paddingHorizontal: 20, marginTop: -40 },

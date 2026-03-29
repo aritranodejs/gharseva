@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
-import { ArrowLeft, CheckCircle2, CreditCard, Banknote, Smartphone, ChevronRight, ShieldCheck, Clock, MapPin } from 'lucide-react-native';
+import { ArrowLeft, CheckCircle2, CreditCard, Banknote, Smartphone, ChevronRight, ShieldCheck, Clock, MapPin, Trash2 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import api from '../services/api';
 import AddressSelectorModal from '../components/AddressSelectorModal';
@@ -29,6 +29,24 @@ export default function ConfirmationScreen({ route, navigation }: Props) {
 
   const [addressModalVisible, setAddressModalVisible] = useState(false);
   const [selectedAddress, setSelectedAddress] = useState<any>(null);
+  const [savedMethods, setSavedMethods] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchMethods = async () => {
+      try {
+        const { data } = await api.get('payments/methods');
+        if (data.success && data.data) {
+          const upiMethods = data.data.filter((m: any) => m.type === 'upi');
+          setSavedMethods(upiMethods);
+          if (upiMethods.length > 0) {
+            setUpiId(upiMethods[0].identifier);
+            setIsVerified(true);
+          }
+        }
+      } catch (err) {}
+    };
+    fetchMethods();
+  }, []);
   
   const [selectedPayment, setSelectedPayment] = useState('upi');
   const [upiId, setUpiId] = useState('');
@@ -43,6 +61,23 @@ export default function ConfirmationScreen({ route, navigation }: Props) {
     setToastMessage(message);
     setToastType(type);
     setToastVisible(true);
+  };
+
+  const handleDeleteMethod = async (methodId: string) => {
+    try {
+      const { data } = await api.delete(`payments/methods/${methodId}`);
+      if (data.success) {
+        showToast('Saved payment method removed', 'success');
+        const upiMethods = data.data.filter((m: any) => m.type === 'upi');
+        setSavedMethods(upiMethods);
+        if (upiMethods.length === 0 || upiId === upiMethods.find((u: any) => u._id === methodId)?.identifier) {
+          setUpiId('');
+          setIsVerified(false);
+        }
+      }
+    } catch (err: any) {
+      showToast('Error removing payment option', 'error');
+    }
   };
   
   // UPI Verification state
@@ -100,6 +135,14 @@ export default function ConfirmationScreen({ route, navigation }: Props) {
         paymentMethod: selectedPayment,
         upiId: selectedPayment === 'upi' ? upiId : undefined
       });
+
+      if (selectedPayment === 'upi' && !savedMethods.find(m => m.identifier === upiId)) {
+        try {
+          await api.post('payments/methods', { type: 'upi', identifier: upiId });
+        } catch (e) {
+          console.warn('Failed to save payment method silently');
+        }
+      }
 
       setSuccess(true);
     } catch (err: any) {
@@ -253,38 +296,62 @@ export default function ConfirmationScreen({ route, navigation }: Props) {
           {selectedPayment === 'upi' && (
             <View style={styles.upiInputBox}>
               <Smartphone size={18} color="#4F46E5" style={{ marginBottom: 10 }} />
-              <Text style={styles.upiInputLabel}>Enter UPI ID</Text>
-              <View style={styles.upiFieldWrapper}>
-                 <TextInput
-                   style={[styles.upiIdInput, { flex: 1, marginBottom: 0 }]}
-                   placeholder="yourname@paytm / @ybl"
-                   value={upiId}
-                   onChangeText={(t) => {
-                     setUpiId(t);
-                     setIsVerified(false);
-                   }}
-                   autoCapitalize="none"
-                   keyboardType="email-address"
-                   editable={!isVerifying}
-                 />
-                 <TouchableOpacity 
-                   style={[styles.verifyBtn, isVerified && styles.verifyBtnSuccess]} 
-                   onPress={handleVerifyUpi}
-                   disabled={isVerifying || isVerified}
-                 >
-                   {isVerifying ? (
-                     <ActivityIndicator color="#FFF" size="small" />
-                   ) : isVerified ? (
-                     <>
-                       <ShieldCheck size={16} color="#FFF" style={{ marginRight: 4 }} />
-                       <Text style={styles.verifyBtnText}>Verified</Text>
-                     </>
-                   ) : (
-                     <Text style={styles.verifyBtnText}>Verify</Text>
-                   )}
+              <Text style={styles.upiInputLabel}>{savedMethods.length > 0 ? 'Select Saved UPI or Add New' : 'Enter UPI ID'}</Text>
+              
+              {savedMethods.map((m: any, idx: number) => (
+                 <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                   <TouchableOpacity style={{ flex: 1, flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: '#FFF', borderTopLeftRadius: 14, borderBottomLeftRadius: 14, borderWidth: 1, borderColor: upiId === m.identifier ? '#4F46E5' : '#E0E7FF', borderRightWidth: 0 }} onPress={() => { setUpiId(m.identifier); setIsVerified(true); }} activeOpacity={0.8}>
+                      <View style={[{ width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center', marginRight: 12 }, upiId === m.identifier && { borderColor: '#4F46E5' }]}>
+                         {upiId === m.identifier && <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#4F46E5' }} />}
+                      </View>
+                      <Text style={{ fontSize: 15, fontWeight: '700', color: '#111827' }}>{m.identifier}</Text>
+                   </TouchableOpacity>
+                   <TouchableOpacity style={{ padding: 18, backgroundColor: '#FFF', borderTopRightRadius: 14, borderBottomRightRadius: 14, borderWidth: 1, borderColor: upiId === m.identifier ? '#4F46E5' : '#E0E7FF', borderLeftWidth: 0, justifyContent: 'center', alignItems: 'center' }} onPress={() => handleDeleteMethod(m._id)}>
+                      <Trash2 size={18} color="#EF4444" />
+                   </TouchableOpacity>
+                 </View>
+              ))}
+
+              {(!savedMethods.length || upiId === '') && (
+                <View style={styles.upiFieldWrapper}>
+                   <TextInput
+                     style={[styles.upiIdInput, { flex: 1, marginBottom: 0 }]}
+                     placeholder="yourname@paytm / @ybl"
+                     value={upiId}
+                     onChangeText={(t) => {
+                       setUpiId(t);
+                       setIsVerified(false);
+                     }}
+                     autoCapitalize="none"
+                     keyboardType="email-address"
+                     editable={!isVerifying}
+                   />
+                   <TouchableOpacity 
+                     style={[styles.verifyBtn, isVerified && styles.verifyBtnSuccess]} 
+                     onPress={handleVerifyUpi}
+                     disabled={isVerifying || isVerified}
+                   >
+                     {isVerifying ? (
+                       <ActivityIndicator color="#FFF" size="small" />
+                     ) : isVerified ? (
+                       <>
+                         <ShieldCheck size={16} color="#FFF" style={{ marginRight: 4 }} />
+                         <Text style={styles.verifyBtnText}>Verified</Text>
+                       </>
+                     ) : (
+                       <Text style={styles.verifyBtnText}>Verify</Text>
+                     )}
+                   </TouchableOpacity>
+                </View>
+              )}
+              {savedMethods.length > 0 && upiId !== '' && (
+                 <TouchableOpacity onPress={() => { setUpiId(''); setIsVerified(false); }} style={{ marginTop: 4, paddingVertical: 8 }}>
+                    <Text style={{ color: '#4F46E5', fontSize: 14, fontWeight: '800' }}>+ Add New UPI ID</Text>
                  </TouchableOpacity>
-              </View>
-              <Text style={styles.upiHintText}>We support GPay, PhonePe, Paytm & all UPI apps</Text>
+              )}
+              {(!savedMethods.length || upiId === '') && (
+                 <Text style={styles.upiHintText}>We support GPay, PhonePe, Paytm & all UPI apps</Text>
+              )}
             </View>
           )}
 

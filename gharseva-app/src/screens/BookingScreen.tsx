@@ -1,10 +1,42 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, RefreshControl, Dimensions, StatusBar, Modal, TextInput, Alert } from 'react-native';
-import { ShoppingBag, Calendar, Clock, ChevronRight, CheckCircle2, Clock3, XCircle, AlertCircle, MapPin, Search, Star, MessageSquare, X } from 'lucide-react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ShoppingBag, Calendar, Clock, ChevronRight, CheckCircle2, Clock3, XCircle, AlertCircle, MapPin, Search, Star, MessageSquare, X, Zap, Droplets, Sparkles, Hammer, Snowflake, ShieldCheck, User, Utensils, Heart, Wind } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import api from '../services/api';
+import PremiumToast from '../components/PremiumToast';
 
 const { width } = Dimensions.get('window');
+
+const ICON_PALETTE: Record<string, { bg: string; iconColor: string }> = {
+  Sparkles:   { bg: '#F5F3FF', iconColor: '#8B5CF6' },
+  Droplets:   { bg: '#EFF6FF', iconColor: '#3B82F6' },
+  Zap:        { bg: '#FFF7ED', iconColor: '#F97316' },
+  Hammer:     { bg: '#FEF3C7', iconColor: '#D97706' },
+  Snowflake:  { bg: '#F0F9FF', iconColor: '#0EA5E9' },
+  ShieldCheck:{ bg: '#ECFDF5', iconColor: '#10B981' },
+  Utensils:   { bg: '#FFF1F2', iconColor: '#E11D48' },
+  Heart:      { bg: '#FFF1F2', iconColor: '#E11D48' },
+  Wind:       { bg: '#F0F9FF', iconColor: '#0EA5E9' },
+  User:       { bg: '#F5F3FF', iconColor: '#7C3AED' },
+};
+
+const getIconInfo = (iconName: string) => {
+  const map: any = {
+    Sparkles, Droplets, Zap, Hammer, Snowflake, ShieldCheck, User, Utensils, Heart, Wind,
+    sparkles: Sparkles, utensils: Utensils, wind: Wind, heart: Heart,
+    droplet: Droplets, '🛠️': Hammer, '❄️': Snowflake,
+  };
+  const key = Object.keys(ICON_PALETTE).find(k => k === iconName || k.toLowerCase() === iconName?.toLowerCase());
+  const palette = key ? ICON_PALETTE[key] : { bg: '#EEF2FF', iconColor: '#4F46E5' };
+  const IconComponent = map[iconName] || map[iconName?.toLowerCase()] || Hammer;
+  return { IconComponent, ...palette };
+};
+
+const getIcon = (iconName: string, size = 24, color = "#4F46E5") => {
+  const { IconComponent } = getIconInfo(iconName);
+  return <IconComponent size={size} color={color} />;
+};
 
 type Booking = {
   _id: string;
@@ -39,9 +71,42 @@ export default function BookingScreen({ navigation }: any) {
   const [comment, setComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastType, setToastType] = useState<'success' | 'error' | 'info'>('info');
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setToastMessage(message);
+    setToastType(type);
+    setToastVisible(true);
+  };
+
   useEffect(() => {
     fetchBookings();
+    setupSocket();
+    return () => {
+      // Disconnect socket if local ref exists
+    };
   }, []);
+
+  const setupSocket = async () => {
+    try {
+      const AsyncStorageLocal = require('@react-native-async-storage/async-storage').default;
+      const token = await AsyncStorageLocal.getItem('userAccessToken');
+      if (!token) return;
+      const { io } = require('socket.io-client');
+      const SOCKET_URL = api.defaults.baseURL?.replace('/api', '') || 'http://192.168.1.6:5000';
+      const socket = io(SOCKET_URL, { auth: { token } });
+
+      socket.on('booking_confirmed', () => fetchBookings());
+      socket.on('booking_status_update', () => fetchBookings());
+      socket.on('booking_cancelled', () => fetchBookings());
+
+      return () => socket.disconnect();
+    } catch (e) {
+      console.error('Socket setup error in BookingScreen:', e);
+    }
+  };
 
   const fetchBookings = async () => {
     setError(null);
@@ -84,11 +149,11 @@ export default function BookingScreen({ navigation }: any) {
         comment: comment
       });
       setRatingModalVisible(false);
-      Alert.alert('Thank you!', 'Your review has been submitted successfully.');
+      showToast('Your review has been submitted successfully.', 'success');
       fetchBookings();
     } catch (err) {
        console.error('Error submitting review:', err);
-       Alert.alert('Error', 'Failed to submit review. Please try again.');
+       showToast('Failed to submit review. Please try again.', 'error');
     } finally {
        setSubmitting(false);
     }
@@ -116,8 +181,8 @@ export default function BookingScreen({ navigation }: any) {
       >
         <View style={styles.cardHeader}>
           <View style={styles.serviceInfo}>
-            <View style={styles.iconWrapper}>
-              <Text style={styles.serviceEmoji}>{item.serviceId?.icon || '🛠️'}</Text>
+            <View style={[styles.iconWrapper, { backgroundColor: getIconInfo(item.serviceId?.icon).bg }]}>
+              {getIcon(item.serviceId?.icon, 24, getIconInfo(item.serviceId?.icon).iconColor)}
             </View>
             <View style={styles.textDetails}>
               <Text style={styles.serviceName} numberOfLines={1}>{item.serviceId?.name || 'Service'}</Text>
@@ -269,6 +334,13 @@ export default function BookingScreen({ navigation }: any) {
             </View>
          </View>
       </Modal>
+
+      <PremiumToast 
+        visible={toastVisible} 
+        message={toastMessage} 
+        type={toastType} 
+        onHide={() => setToastVisible(false)} 
+      />
     </View>
   );
 }

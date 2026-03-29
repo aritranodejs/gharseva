@@ -83,6 +83,17 @@ class WorkerController {
       sendError(res, 'Error updating location');
     }
   }
+
+  async savePushToken(req, res) {
+    const { token, platform } = req.body;
+    try {
+      if (!token) return sendError(res, 'Push token required', 400);
+      await require('../models/Worker').findByIdAndUpdate(req.worker._id, { pushToken: token });
+      sendSuccess(res, { token, platform }, 'Push token saved');
+    } catch (err) {
+      sendError(res, 'Error saving push token');
+    }
+  }
 }
 
 module.exports = new WorkerController();

@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar, Alert, Modal, TextInput, ActivityIndicator } from 'react-native';
 import api from '../services/api';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowLeft, CreditCard, Plus, ShieldCheck, X, Smartphone, Check } from 'lucide-react-native';
+import { ArrowLeft, CreditCard, Plus, ShieldCheck, X, Smartphone, Check, Trash2 } from 'lucide-react-native';
+import PremiumToast from '../components/PremiumToast';
+import PremiumConfirmModal from '../components/PremiumConfirmModal';
 
 const UPI_APPS = [
   { id: 'gpay', name: 'Google Pay', suffix: '@okicici', color: '#4285F4' },
@@ -34,6 +36,19 @@ export default function PaymentsScreen({ navigation }: any) {
   const [isVerified, setIsVerified] = useState(false);
   const [verifiedName, setVerifiedName] = useState('');
 
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastType, setToastType] = useState<any>('info');
+
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [methodToDelete, setMethodToDelete] = useState<{id: string, type: 'upi' | 'card'} | null>(null);
+
+  const showToast = (message: string, type: any = 'info') => {
+    setToastMessage(message);
+    setToastType(type);
+    setToastVisible(true);
+  };
+
   // Helper: Luhn Algorithm
   const isValidCard = (number: string) => {
     let sum = 0;
@@ -54,7 +69,12 @@ export default function PaymentsScreen({ navigation }: any) {
       const { data: response } = await api.get('payments/methods');
       const methodList = response.data || [];
       
-      setCards(methodList.filter((m: any) => m.type === 'card'));
+      setCards(methodList.filter((m: any) => m.type === 'card').map((m: any) => ({
+         id: m._id,
+         number: m.identifier,
+         expiry: m.expiryInfo || '**/**',
+         brand: m.brand || 'Card'
+      })));
       const formatUpi = methodList.filter((m: any) => m.type === 'upi').map((m: any) => {
          const appInfo = UPI_APPS.find(a => a.name === m.brand) || UPI_APPS[3];
          return { id: m._id, upiId: m.identifier, app: m.brand, color: appInfo.color };
@@ -62,6 +82,7 @@ export default function PaymentsScreen({ navigation }: any) {
       setUpiIds(formatUpi);
     } catch(err) {
       console.error(err);
+      showToast('Failed to load payment methods.', 'error');
     } finally {
       setLoading(false);
     }
@@ -73,7 +94,7 @@ export default function PaymentsScreen({ navigation }: any) {
 
   const handleAddCard = async () => {
     if (!isValidCard(newCard.number)) {
-      Alert.alert('Invalid Card', 'The card number entered is not a valid credit/debit card number.');
+      showToast('The card number entered is not a valid credit/debit card number.', 'error');
       return;
     }
     
@@ -89,15 +110,15 @@ export default function PaymentsScreen({ navigation }: any) {
       await fetchMethods();
       setCardModalVisible(false);
       setNewCard({ number: '', expiry: '', cvv: '' });
-      Alert.alert('Success', 'Card added successfully!');
+      showToast('Card added successfully!', 'success');
     } catch (err: any) {
-      Alert.alert('Error', err.response?.data?.message || 'Failed to add card');
+      showToast(err.response?.data?.message || 'Failed to add card', 'error');
     }
   };
 
   const handleAddUpi = async () => {
     if (!isVerified) {
-      Alert.alert('Verification Required', 'Please verify your UPI ID before saving.');
+      showToast('Please verify your UPI ID before saving.', 'info');
       return;
     }
     const fullId = newUpiId.includes('@') ? newUpiId : `${newUpiId}${selectedUpiApp.suffix}`;
@@ -113,15 +134,15 @@ export default function PaymentsScreen({ navigation }: any) {
       setNewUpiId('');
       setIsVerified(false);
       setVerifiedName('');
-      Alert.alert('Success', `${selectedUpiApp.name} UPI ID saved!`);
+      showToast(`${selectedUpiApp.name} UPI ID saved!`, 'success');
     } catch(err: any) {
-      Alert.alert('Error', err.response?.data?.message || 'Failed to add UPI');
+      showToast(err.response?.data?.message || 'Failed to add UPI', 'error');
     }
   };
 
   const handleVerifyUpi = async () => {
     if (!newUpiId || newUpiId.length < 3) {
-      Alert.alert('Error', 'Please enter a valid UPI ID (e.g., name@paytm)');
+      showToast('Please enter a valid UPI ID (e.g., name@paytm)', 'info');
       return;
     }
 
@@ -136,7 +157,7 @@ export default function PaymentsScreen({ navigation }: any) {
         setNewUpiId(data.verifiedId); 
       }
     } catch(err: any) {
-      Alert.alert('Verification Failed', err.response?.data?.message || 'Format is incorrect');
+      showToast(err.response?.data?.message || 'Verification Failed. Please check format.', 'error');
       setIsVerified(false);
       setVerifiedName('');
     } finally {
@@ -144,18 +165,23 @@ export default function PaymentsScreen({ navigation }: any) {
     }
   };
 
-  const handleDeleteUpi = (id: string) => {
-    Alert.alert('Remove UPI', 'Remove this UPI ID?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Remove', style: 'destructive', onPress: async () => {
-         try {
-           await api.delete(`payments/methods/${id}`);
-           fetchMethods();
-         } catch(err) {
-           Alert.alert('Error', 'Failed to remove');
-         }
-      }}
-    ]);
+  const handleDeleteMethod = (id: string, type: 'upi' | 'card') => {
+    setMethodToDelete({id, type});
+    setShowDeleteModal(true);
+  };
+
+  const confirmDeleteMethod = async () => {
+    if (!methodToDelete) return;
+    try {
+      await api.delete(`payments/methods/${methodToDelete.id}`);
+      fetchMethods();
+      showToast(`${methodToDelete.type === 'upi' ? 'UPI ID' : 'Card'} removed successfully`, 'success');
+    } catch (err) {
+      showToast('Failed to remove payment method', 'error');
+    } finally {
+      setShowDeleteModal(false);
+      setMethodToDelete(null);
+    }
   };
 
   return (
@@ -188,8 +214,8 @@ export default function PaymentsScreen({ navigation }: any) {
           ))}
         </View>
 
-        {upiIds.length > 0 && upiIds.map(upi => (
-          <View key={upi.id} style={styles.upiCard}>
+        {upiIds.length > 0 && upiIds.map((upi, idx) => (
+          <View key={upi.id || `upi-${idx}`} style={styles.upiCard}>
             <View style={[styles.upiIconBox, { backgroundColor: upi.color + '20' }]}>
               <Smartphone size={20} color={upi.color} />
             </View>
@@ -197,7 +223,7 @@ export default function PaymentsScreen({ navigation }: any) {
               <Text style={styles.upiIdText}>{upi.upiId}</Text>
               <Text style={styles.upiAppLabel}>{upi.app}</Text>
             </View>
-            <TouchableOpacity onPress={() => handleDeleteUpi(upi.id)} style={styles.upiDelete}>
+            <TouchableOpacity onPress={() => handleDeleteMethod(upi.id, 'upi')} style={styles.upiDelete}>
               <X size={16} color="#EF4444" />
             </TouchableOpacity>
           </View>
@@ -212,14 +238,17 @@ export default function PaymentsScreen({ navigation }: any) {
 
         {/* Saved Cards */}
         <Text style={styles.subTitle}>SAVED CARDS</Text>
-        {cards.map(card => (
-          <View key={card.id} style={styles.cardItem}>
+        {cards.map((card, idx) => (
+          <View key={card.id || `card-${idx}`} style={styles.cardItem}>
              <View style={styles.cardIconBox}><CreditCard size={22} color="#4F46E5" /></View>
-             <View style={styles.cardInfo}>
+             <View style={[styles.cardInfo, { flex: 1 }]}>
                <Text style={styles.cardNumber}>{card.number}</Text>
                <Text style={styles.cardExpiry}>Expires {card.expiry}</Text>
              </View>
              <View style={styles.brandBadge}><Text style={styles.brandText}>{card.brand}</Text></View>
+             <TouchableOpacity onPress={() => handleDeleteMethod(card.id, 'card')} style={{ marginLeft: 16, padding: 8 }}>
+                 <Trash2 size={18} color="#EF4444" />
+             </TouchableOpacity>
           </View>
         ))}
 
@@ -334,6 +363,24 @@ export default function PaymentsScreen({ navigation }: any) {
           </View>
         </View>
       </Modal>
+
+      <PremiumToast 
+        visible={toastVisible} 
+        message={toastMessage} 
+        type={toastType} 
+        onHide={() => setToastVisible(false)} 
+      />
+
+      <PremiumConfirmModal 
+        visible={showDeleteModal} 
+        title={`Remove ${methodToDelete?.type === 'card' ? 'Card' : 'UPI ID'}`} 
+        message={`Are you sure you want to permanently remove this ${methodToDelete?.type === 'card' ? 'Card' : 'UPI ID'} from your profile?`} 
+        confirmText="Remove" 
+        cancelText="Cancel" 
+        onConfirm={confirmDeleteMethod} 
+        onCancel={() => setShowDeleteModal(false)} 
+        type="danger" 
+      />
     </View>
   );
 }

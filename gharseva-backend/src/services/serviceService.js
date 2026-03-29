@@ -11,7 +11,7 @@ class ServiceService {
       ];
     }
     if (categoryId) {
-      query.category = categoryId;
+      query.categoryId = categoryId;
     }
     return await serviceRepository.findAll(query);
   }

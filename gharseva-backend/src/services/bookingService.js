@@ -1,5 +1,6 @@
 const { BOOKING_STATUS } = require('../utils/constants');
 const Worker = require('../models/Worker');
+const notificationService = require('./notificationService');
 
 class BookingService {
   get bookingRepository() {
@@ -39,7 +40,11 @@ class BookingService {
 
     booking.assignedWorkerId = workerId;
     booking.status = BOOKING_STATUS.CONFIRMED;
+    booking.acceptedAt = new Date(); // Record acceptance time
     await booking.save();
+
+    // Increment worker's active bookings count
+    await Worker.findByIdAndUpdate(workerId, { $inc: { activeBookingsCount: 1 } });
 
     // Trigger Socket.io (if global.io exists)
     if (global.io) {
@@ -54,21 +59,41 @@ class BookingService {
       });
     }
 
-    return booking;
+    // CREATE PERSISTENT NOTIFICATIONS
+    await notificationService.createNotification({
+       userId: booking.userId,
+       title: 'Booking Confirmed!',
+       message: `${workerName} has accepted your ${booking.serviceName} request.`,
+       type: 'booking'
+    });
+
+    // RE-POPULATE before returning to ensure worker sees customer name
+    const finalBooking = await this.bookingRepository.findById(booking._id);
+    return finalBooking || booking;
   }
 
   async updateBookingStatus(bookingId, workerId, status, userId, otp = null) {
-    const booking = await this.bookingRepository.updateStatus(bookingId, status, workerId);
-    if (!booking) throw new Error('Booking not found or unauthorized');
+    const booking = await this.bookingRepository.findById(bookingId);
+    if (!booking) throw new Error('Booking not found');
+
+    if (status === 'in_progress') {
+        booking.startedAt = new Date();
+    } else if (status === 'completed') {
+        booking.completedAt = new Date();
+    }
+    await booking.save();
+
+    const updatedBooking = await this.bookingRepository.updateStatus(bookingId, status, workerId);
+    if (!updatedBooking) throw new Error('Booking update failed or unauthorized');
 
     if (status === 'completed') {
       if (!otp || String(booking.completionOtp) !== String(otp)) {
         // Rollback status to previous (which should be in_progress) if wrong OTP
-        await bookingRepository.updateStatus(bookingId, 'in_progress', workerId);
+        await this.bookingRepository.updateStatus(bookingId, 'in_progress', workerId);
         throw new Error('Invalid Completion OTP. Ask the customer for their 4-digit PIN.');
       }
 
-      const platformFee = Math.round(booking.price * 0.1); // 10% platform fee
+      const platformFee = booking.platformFee || Math.max(29, Math.round(booking.price * 0.1));
       const workerEarnings = booking.price - platformFee;
       
       await this.bookingRepository.updateInternalStatus(bookingId, status, workerId);
@@ -92,15 +117,33 @@ class BookingService {
       });
     }
 
-    return booking;
+    // Notify user of completion
+    if (status === 'completed') {
+      await notificationService.createNotification({
+         userId: booking.userId,
+         title: 'Service Completed',
+         message: `Your ${booking.serviceName} has been successfully completed.`,
+         type: 'booking'
+      });
+    }
+
+    // RE-POPULATE before returning to ensure worker sees customer name
+    const finalBooking = await this.bookingRepository.findById(booking._id);
+    return finalBooking || booking;
   }
 
   async createUserBooking(userId, bookingData) {
-    const platformFee = Math.round(bookingData.price * 0.1) || 29; // 10% platform fee, min 29
+    // Read platform fee from ENV, default to 29 if not set or invalid
+    const envFee = parseInt(process.env.PLATFORM_FEE);
+    const platformFee = !isNaN(envFee) ? envFee : 29;
+    
+    const totalAmount = bookingData.price + platformFee;
+
     const booking = await this.bookingRepository.create({
       userId,
       ...bookingData,
       platformFee,
+      totalAmount,
       status: BOOKING_STATUS.PENDING
     });
     return booking;
@@ -110,12 +153,18 @@ class BookingService {
     return await this.bookingRepository.findByUser(userId);
   }
 
-  async getBookingById(bookingId, userId) {
+  async getBookingById(bookingId, userId, workerId) {
     const booking = await this.bookingRepository.findById(bookingId);
     if (!booking) throw new Error('Booking not found');
     
-    // Security check: ensure booking belongs to user
-    if (String(booking.userId) !== String(userId)) {
+    // Security check: ensure booking belongs to user or assigned to worker
+    const ownerId = booking.userId?._id || booking.userId;
+    const isOwner = userId && String(ownerId) === String(userId);
+    
+    const assignedId = booking.assignedWorkerId?._id || booking.assignedWorkerId;
+    const isAssignedWorker = workerId && assignedId && String(assignedId) === String(workerId);
+
+    if (!isOwner && !isAssignedWorker) {
       throw new Error('Unauthorized access to booking');
     }
     
@@ -137,7 +186,32 @@ class BookingService {
     booking.status = BOOKING_STATUS.CANCELLED;
     booking.cancelReason = reason;
     booking.cancelledBy = cancelledBy;
+    booking.cancelledAt = new Date(); // Record cancellation time
     await booking.save();
+
+    // If it was an active job assigned to a worker, decrement their active count
+    if (booking.assignedWorkerId) {
+      const wId = booking.assignedWorkerId?._id || booking.assignedWorkerId;
+      await Worker.findByIdAndUpdate(wId, { 
+        $inc: { activeBookingsCount: -1 } 
+      });
+
+      // Notify worker of cancellation
+      await notificationService.createNotification({
+        workerId: wId,
+        title: 'Booking Cancelled',
+        message: `Booking for ${booking.serviceName} has been cancelled.`,
+        type: 'booking'
+      });
+    } else {
+      // If it was still pending, notify user (if they cancelled) or just log
+      await notificationService.createNotification({
+        userId: booking.userId,
+        title: 'Booking Cancelled',
+        message: `Your booking for ${booking.serviceName} has been cancelled.`,
+        type: 'booking'
+      });
+    }
 
     // Notify the other party
     if (global.io) {

@@ -22,8 +22,9 @@ const workerSchema = new mongoose.Schema(
     profilePicture: { type: String, default: '' },
     activeBookingsCount: { type: Number, default: 0 },
     rating: { type: Number, default: 4.5 },
-    totalEarnings: { type: Number, default: 0 }, // Added for Revenue Model
+    totalEarnings: { type: Number, default: 0 },
     isTrustVerified: { type: Boolean, default: false },
+    pushToken: { type: String, default: '' }, // Expo push token for notifications
     location: {
       type: { type: String, enum: ['Point'], default: 'Point' },
       coordinates: { type: [Number], default: [0, 0] } // [lng, lat]

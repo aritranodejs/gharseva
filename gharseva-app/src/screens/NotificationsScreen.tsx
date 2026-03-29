@@ -49,6 +49,15 @@ export default function NotificationsScreen({ navigation }: any) {
     }
   };
 
+  const markAllAsRead = async () => {
+    try {
+       await api.post('notifications/read-all');
+       fetchNotifications();
+    } catch (error) {
+       console.error('Error marking all as read:', error);
+    }
+  };
+
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
     const now = new Date();
@@ -78,7 +87,13 @@ export default function NotificationsScreen({ navigation }: any) {
           <ArrowLeft size={24} color="#111827" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Notifications</Text>
-        <TouchableOpacity onPress={onRefresh}><Text style={styles.markRead}>Refresh</Text></TouchableOpacity>
+        {notifications.length > 0 ? (
+          <TouchableOpacity onPress={markAllAsRead}>
+            <Text style={styles.markRead}>Mark all read</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={{ width: 80 }} />
+        )}
       </View>
 
       <ScrollView 

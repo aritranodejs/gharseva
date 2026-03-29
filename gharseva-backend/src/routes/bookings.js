@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const bookingController = require('../controllers/bookingController');
-const { protect } = require('../middleware/authMiddleware');
+const { protect, protectAny } = require('../middleware/authMiddleware');
 
 /**
  * @route   POST /api/bookings
@@ -22,13 +22,13 @@ router.get('/', protect, bookingController.getUserBookings);
  * @desc    Get details for a single booking
  * @access  Private
  */
-router.get('/:id', protect, bookingController.getById);
+router.get('/:id', protectAny, bookingController.getById);
 
 /**
  * @route   PATCH /api/bookings/:id/cancel
  * @desc    User cancels their booking
  * @access  Private
  */
-router.patch('/:id/cancel', protect, bookingController.cancel);
+router.patch('/:id/cancel', protectAny, bookingController.cancel);
 
 module.exports = router;

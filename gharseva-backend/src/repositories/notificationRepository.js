@@ -25,6 +25,10 @@ class NotificationRepository {
       { isRead: true }
     );
   }
+
+  async create(data) {
+    return await Notification.create(data);
+  }
 }
 
 module.exports = new NotificationRepository();

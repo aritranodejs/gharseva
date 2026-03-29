@@ -1,7 +1,37 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Image, Dimensions, StatusBar, Alert, Linking, Modal, TextInput } from 'react-native';
-import { ChevronLeft, Calendar, Clock, MapPin, Phone, Star, CheckCircle2, Clock3, AlertCircle, ShoppingBag, ShieldCheck } from 'lucide-react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Image, Dimensions, StatusBar, Alert, Linking, Modal, TextInput, RefreshControl } from 'react-native';
+import { ChevronLeft, Calendar, Clock, MapPin, Phone, Star, CheckCircle2, Clock3, AlertCircle, ShoppingBag, ShieldCheck, Zap, Droplets, Sparkles, Hammer, Snowflake, User, Utensils, Heart, Wind } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+const ICON_PALETTE: Record<string, { bg: string; iconColor: string }> = {
+  Sparkles:   { bg: '#F5F3FF', iconColor: '#8B5CF6' },
+  Droplets:   { bg: '#EFF6FF', iconColor: '#3B82F6' },
+  Zap:        { bg: '#FFF7ED', iconColor: '#F97316' },
+  Hammer:     { bg: '#FEF3C7', iconColor: '#D97706' },
+  Snowflake:  { bg: '#F0F9FF', iconColor: '#0EA5E9' },
+  ShieldCheck:{ bg: '#ECFDF5', iconColor: '#10B981' },
+  Utensils:   { bg: '#FFF1F2', iconColor: '#E11D48' },
+  Heart:      { bg: '#FFF1F2', iconColor: '#E11D48' },
+  Wind:       { bg: '#F0F9FF', iconColor: '#0EA5E9' },
+  User:       { bg: '#F5F3FF', iconColor: '#7C3AED' },
+};
+
+const getIconInfo = (iconName: string) => {
+  const map: any = {
+    Sparkles, Droplets, Zap, Hammer, Snowflake, ShieldCheck, User, Utensils, Heart, Wind,
+    sparkles: Sparkles, utensils: Utensils, wind: Wind, heart: Heart,
+    droplet: Droplets, '🛠️': Hammer, '❄️': Snowflake,
+  };
+  const key = Object.keys(ICON_PALETTE).find(k => k === iconName || k.toLowerCase() === iconName?.toLowerCase());
+  const palette = key ? ICON_PALETTE[key] : { bg: '#EEF2FF', iconColor: '#4F46E5' };
+  const IconComponent = map[iconName] || map[iconName?.toLowerCase()] || Hammer;
+  return { IconComponent, ...palette };
+};
+
+const getIcon = (iconName: string, size = 24, color = "#4F46E5") => {
+  const { IconComponent } = getIconInfo(iconName);
+  return <IconComponent size={size} color={color} />;
+};
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { io, Socket } from 'socket.io-client';
 import api, { getImageUrl } from '../services/api';
@@ -14,6 +44,7 @@ export default function BookingDetailScreen({ route, navigation }: any) {
   const insets = useSafeAreaInsets();
   const [booking, setBooking] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [cancelModalVisible, setCancelModalVisible] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [cancelling, setCancelling] = useState(false);
@@ -31,12 +62,12 @@ export default function BookingDetailScreen({ route, navigation }: any) {
     let socket: Socket;
     const initSocket = async () => {
       try {
-        const userData = await AsyncStorage.getItem('userData');
-        if (userData) {
-           const { _id } = JSON.parse(userData);
+        const userId = await AsyncStorage.getItem('userId');
+        const token = await AsyncStorage.getItem('userAccessToken');
+        if (userId && token) {
            const socketUrl = api.defaults.baseURL?.toString().replace('/api', '') || 'http://192.168.1.5:5000';
-           socket = io(socketUrl);
-           socket.emit('register_user', _id);
+           socket = io(socketUrl, { auth: { token } });
+           socket.emit('register_user', userId);
            socket.on('booking_status_update', (data) => {
               if (data.bookingId === bookingId) {
                  fetchBookingDetails();
@@ -62,7 +93,13 @@ export default function BookingDetailScreen({ route, navigation }: any) {
       showToast('Failed to load booking details', 'error');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
+  };
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchBookingDetails();
   };
 
   const handleCall = () => {
@@ -128,7 +165,11 @@ export default function BookingDetailScreen({ route, navigation }: any) {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+      <ScrollView 
+        showsVerticalScrollIndicator={false} 
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#4F46E5" />}
+      >
         {/* Status Section */}
         <View style={styles.statusSection}>
            <View style={[styles.statusIconWrapper, { backgroundColor: getStatusColor(booking.status) + '15' }]}>
@@ -141,12 +182,81 @@ export default function BookingDetailScreen({ route, navigation }: any) {
         {/* Service Summary */}
         <View style={styles.section}>
           <View style={styles.serviceRow}>
-            <View style={styles.serviceIcon}>
-              <Text style={{ fontSize: 32 }}>{booking.serviceId?.icon || '🛠️'}</Text>
+            <View style={[styles.serviceIcon, { backgroundColor: getIconInfo(booking.serviceId?.icon).bg }]}>
+              {getIcon(booking.serviceId?.icon, 32, getIconInfo(booking.serviceId?.icon).iconColor)}
             </View>
             <View style={styles.serviceText}>
               <Text style={styles.serviceName}>{booking.serviceId?.name || 'Home Service'}</Text>
               <Text style={styles.serviceSub}>Standard Professional Service</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* ── Job Timeline ── */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Job Timeline</Text>
+          <View style={styles.timelineCard}>
+            {/* Step 1: Requested */}
+            <View style={styles.timelineItem}>
+               <View style={styles.timelineLeading}>
+                  <View style={[styles.timelineDot, { backgroundColor: '#4F46E5' }]} />
+                  <View style={[styles.timelineLine, { backgroundColor: booking.acceptedAt ? '#4F46E5' : '#E5E7EB' }]} />
+               </View>
+               <View style={styles.timelineContent}>
+                  <Text style={styles.timelineTitle}>Booking Requested</Text>
+                  <Text style={styles.timelineTime}>{new Date(booking.createdAt).toLocaleString('en-IN', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' })}</Text>
+               </View>
+            </View>
+
+            {/* Step 2: Accepted */}
+            <View style={styles.timelineItem}>
+               <View style={styles.timelineLeading}>
+                  <View style={[styles.timelineDot, { backgroundColor: booking.acceptedAt ? '#4F46E5' : '#E5E7EB' }]} />
+                  <View style={[styles.timelineLine, { backgroundColor: booking.startedAt ? '#4F46E5' : '#E5E7EB' }]} />
+               </View>
+               <View style={styles.timelineContent}>
+                  <Text style={[styles.timelineTitle, !booking.acceptedAt && styles.timelineTitlePending]}>Professional Assigned</Text>
+                  {booking.acceptedAt ? (
+                    <Text style={styles.timelineTime}>{new Date(booking.acceptedAt).toLocaleString('en-IN', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' })}</Text>
+                  ) : (
+                    <Text style={styles.timelineStatus}>Waiting for acceptance...</Text>
+                  )}
+               </View>
+            </View>
+
+            {/* Step 3: Started */}
+            <View style={styles.timelineItem}>
+               <View style={styles.timelineLeading}>
+                  <View style={[styles.timelineDot, { backgroundColor: booking.startedAt ? '#4F46E5' : '#E5E7EB' }]} />
+                  <View style={[styles.timelineLine, { backgroundColor: (booking.completedAt || booking.cancelledAt) ? (booking.cancelledAt ? '#EF4444' : '#10B981') : '#E5E7EB' }]} />
+               </View>
+               <View style={styles.timelineContent}>
+                  <Text style={[styles.timelineTitle, !booking.startedAt && styles.timelineTitlePending]}>Service Started</Text>
+                  {booking.startedAt ? (
+                    <Text style={styles.timelineTime}>{new Date(booking.startedAt).toLocaleString('en-IN', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' })}</Text>
+                  ) : (
+                    <Text style={styles.timelineStatus}>Pending service start</Text>
+                  )}
+               </View>
+            </View>
+
+            {/* Step 4: Final State */}
+            <View style={[styles.timelineItem, { marginBottom: 0 }]}>
+               <View style={styles.timelineLeading}>
+                  <View style={[styles.timelineDot, { backgroundColor: booking.completedAt ? '#10B981' : (booking.cancelledAt ? '#EF4444' : '#E5E7EB') }]} />
+               </View>
+               <View style={styles.timelineContent}>
+                  <Text style={[styles.timelineTitle, !(booking.completedAt || booking.cancelledAt) && styles.timelineTitlePending]}>
+                    {booking.cancelledAt ? 'Booking Cancelled' : (booking.completedAt ? 'Service Completed' : 'Final Step')}
+                  </Text>
+                  {booking.completedAt ? (
+                    <Text style={styles.timelineTime}>{new Date(booking.completedAt).toLocaleString('en-IN', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' })}</Text>
+                  ) : booking.cancelledAt ? (
+                    <Text style={[styles.timelineTime, { color: '#EF4444' }]}>{new Date(booking.cancelledAt).toLocaleString('en-IN', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' })}</Text>
+                  ) : (
+                    <Text style={styles.timelineStatus}>Awaiting completion</Text>
+                  )}
+               </View>
             </View>
           </View>
         </View>
@@ -245,12 +355,12 @@ export default function BookingDetailScreen({ route, navigation }: any) {
               </View>
               <View style={styles.priceRow}>
                  <Text style={styles.priceLabel}>Platform Fee</Text>
-                 <Text style={styles.priceValue}>₹{booking.platformFee || Math.max(29, Math.round(booking.price * 0.1))}</Text>
+                 <Text style={styles.priceValue}>₹{booking.platformFee || 29}</Text>
               </View>
               <View style={styles.divider} />
               <View style={styles.priceRow}>
                  <Text style={styles.totalLabel}>Total Payable</Text>
-                 <Text style={styles.totalValue}>₹{booking.price + (booking.platformFee || Math.max(29, Math.round(booking.price * 0.1)))}</Text>
+                 <Text style={styles.totalValue}>₹{booking.totalAmount || (booking.price + (booking.platformFee || 29))}</Text>
               </View>
            </View>
         </View>
@@ -259,6 +369,13 @@ export default function BookingDetailScreen({ route, navigation }: any) {
            <ShieldCheck size={16} color="#10B981" />
            <Text style={styles.trustFooterText}>Service backed by GharSeva Guarantee</Text>
         </View>
+        {booking.paymentMethod && (
+           <View style={{ alignItems: 'center', marginTop: 10 }}>
+              <Text style={{ color: '#059669', fontWeight: '900', fontSize: 13, backgroundColor: '#ECFDF5', paddingHorizontal: 16, paddingVertical: 6, borderRadius: 12 }}>
+                 Paid via: {booking.paymentMethod === 'upi' ? 'UPI / Online' : 'Cash'}
+              </Text>
+           </View>
+        )}
 
         <View style={{ height: 100 }} />
       </ScrollView>
@@ -374,5 +491,17 @@ const styles = StyleSheet.create({
   modalCancelBtn: { flex: 1, padding: 16, alignItems: 'center', borderRadius: 16, backgroundColor: '#F3F4F6' },
   modalCancelText: { fontSize: 15, fontWeight: '700', color: '#4B5563' },
   modalConfirmBtn: { flex: 2, padding: 16, alignItems: 'center', borderRadius: 16, backgroundColor: '#EF4444' },
-  modalConfirmText: { fontSize: 15, fontWeight: '800', color: '#FFFFFF' }
+  modalConfirmText: { fontSize: 15, fontWeight: '800', color: '#FFFFFF' },
+
+  // Timeline Styles
+  timelineCard: { backgroundColor: '#FFFFFF', borderRadius: 24, padding: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 },
+  timelineItem: { flexDirection: 'row', marginBottom: 12 },
+  timelineLeading: { alignItems: 'center', width: 24, marginRight: 16 },
+  timelineDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: '#E5E7EB', zIndex: 2, marginTop: 4 },
+  timelineLine: { position: 'absolute', top: 12, bottom: -12, width: 2, backgroundColor: '#E5E7EB', left: 11, zIndex: 1 },
+  timelineContent: { flex: 1, paddingBottom: 16 },
+  timelineTitle: { fontSize: 15, fontWeight: '800', color: '#111827' },
+  timelineTitlePending: { color: '#9CA3AF' },
+  timelineTime: { fontSize: 12, color: '#6B7280', marginTop: 4, fontWeight: '600' },
+  timelineStatus: { fontSize: 12, color: '#9CA3AF', marginTop: 4, fontStyle: 'italic', fontWeight: '500' },
 });

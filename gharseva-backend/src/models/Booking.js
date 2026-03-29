@@ -17,8 +17,16 @@ const bookingSchema = mongoose.Schema(
     subscriptionId: { type: mongoose.Schema.Types.ObjectId, ref: 'Subscription' },
     platformFee: { type: Number, default: 0 },   // Added for Revenue Model
     workerEarnings: { type: Number, default: 0 }, // Added for Revenue Model
+    totalAmount: { type: Number, default: 0 },    // Base price + platform fee
+    paymentMethod: { type: String, enum: ['upi', 'cash', 'card', 'online'], default: 'cash' },
+    paymentStatus: { type: String, enum: ['pending', 'paid', 'failed', 'refunded'], default: 'pending' },
+    upiId: { type: String },
     cancelReason: { type: String },
     cancelledBy: { type: String, enum: ['user', 'worker'] },
+    acceptedAt: { type: Date },
+    startedAt: { type: Date },
+    completedAt: { type: Date },
+    cancelledAt: { type: Date },
     completionOtp: { type: String, default: () => Math.floor(1000 + Math.random() * 9000).toString() }
   },
   {

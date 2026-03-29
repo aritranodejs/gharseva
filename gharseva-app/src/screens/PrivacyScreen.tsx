@@ -16,7 +16,7 @@ export default function PrivacyScreen({ navigation }: any) {
   const fetchPrivacy = async () => {
     try {
       const { data } = await api.get('help/privacy');
-      setPolicy(data);
+      if (data.data) setPolicy(data.data);
     } catch (error) {
        console.error('Error fetching privacy:', error);
     } finally {
@@ -24,16 +24,13 @@ export default function PrivacyScreen({ navigation }: any) {
     }
   };
 
-  if (loading) {
-    return (
-      <View style={[styles.container, { paddingTop: insets.top, justifyContent: 'center', alignItems: 'center' }]}>
-         <ActivityIndicator size="large" color="#4F46E5" />
-      </View>
-    );
-  }
-
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
+      {loading && !policy && (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="small" color="#4F46E5" />
+        </View>
+      )}
       <StatusBar barStyle="dark-content" />
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
@@ -72,11 +69,31 @@ export default function PrivacyScreen({ navigation }: any) {
 
         <View style={styles.policySection}>
            <View style={styles.sectionHeader}>
-              <FileText size={20} color="#111827" />
-              <Text style={styles.sectionTitle}>Full Policy</Text>
+              <ShieldCheck size={20} color="#111827" />
+              <Text style={styles.sectionTitle}>Data Security</Text>
            </View>
            <Text style={styles.policyText}>
-              {policy?.content || 'Loading content...'}
+              We implement industry-standard security measures to protect your data. Your payment information is processed through secure, encrypted gateways and is never stored on our servers.
+           </Text>
+        </View>
+
+        <View style={styles.policySection}>
+           <View style={styles.sectionHeader}>
+              <FileText size={20} color="#111827" />
+              <Text style={styles.sectionTitle}>User Rights</Text>
+           </View>
+           <Text style={styles.policyText}>
+              You have the right to access, update, or delete your personal information at any time through your profile settings or by contacting our support team.
+           </Text>
+        </View>
+
+        <View style={styles.policySection}>
+           <View style={styles.sectionHeader}>
+              <Lock size={20} color="#111827" />
+              <Text style={styles.sectionTitle}>Legal & Terms</Text>
+           </View>
+           <Text style={styles.policyText}>
+              {policy?.content || 'GharSeva is committed to providing a safe and reliable platform for all users. By using our services, you agree to our Terms of Service and this Privacy Policy.'}
            </Text>
         </View>
 
@@ -90,6 +107,7 @@ export default function PrivacyScreen({ navigation }: any) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#FFF' },
+  loadingOverlay: { position: 'absolute', top: 100, left: 0, right: 0, alignItems: 'center', zIndex: 10 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
   backBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#F9FAFB', justifyContent: 'center', alignItems: 'center' },
   headerTitle: { fontSize: 18, fontWeight: '900', color: '#111827' },
