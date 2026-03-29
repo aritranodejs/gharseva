@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const serviceSchema = mongoose.Schema(
   {
     name: { type: String, required: true },
-    categoryId: { type: String, required: true },
+    categoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'Category', required: true },
     priceType: { type: String, enum: ['fixed', 'hourly', 'visit'], default: 'fixed' },
     basePrice: { type: Number, required: true },
     duration: { type: String, required: true }, // e.g., '1 hr'

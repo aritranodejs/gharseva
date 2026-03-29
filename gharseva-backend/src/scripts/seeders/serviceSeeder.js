@@ -1,14 +1,20 @@
 const Service = require('../../models/Service');
+const Category = require('../../models/Category');
 
 const seedServices = async () => {
   await Service.deleteMany({});
+  
+  // Fetch all categories to map slugs to IDs
+  const categories = await Category.find({});
+  const getCatId = (slug) => categories.find(c => c.slug === slug)?._id;
+
   const services = await Service.create([
     { 
       name: 'Home Cleaning', 
-      categoryId: 'cleaning', 
+      categoryId: getCatId('cleaning'), 
       basePrice: 499, 
       duration: '2 hrs', 
-      icon: '🧹',
+      icon: 'sparkles',
       image: 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=500&auto=format&fit=crop&q=60',
       description: 'Professional deep cleaning for your entire home.',
       included: ['Dusting all surfaces', 'Mopping floors', 'Bathroom sanitization', 'Kitchen cleaning'],
@@ -19,10 +25,10 @@ const seedServices = async () => {
     },
     { 
       name: 'Dishwashing', 
-      categoryId: 'cleaning', 
+      categoryId: getCatId('cleaning'), 
       basePrice: 199, 
       duration: '1 hr', 
-      icon: '🍽️',
+      icon: 'utensils',
       image: 'https://images.unsplash.com/photo-1585093710594-e35fe8ba2066?w=500&auto=format&fit=crop&q=60',
       description: 'Get your dishes sparkling clean without the hassle.',
       included: ['Scrubbing and washing', 'Drying and stacking', 'Sink area cleaning'],
@@ -33,10 +39,10 @@ const seedServices = async () => {
     },
     { 
       name: 'Clothes Washing', 
-      categoryId: 'cleaning', 
+      categoryId: getCatId('cleaning'), 
       basePrice: 249, 
       duration: '1.5 hrs', 
-      icon: '👕',
+      icon: 'sparkles',
       image: 'https://images.unsplash.com/photo-1582735689369-4fe89db7114c?w=500&auto=format&fit=crop&q=60',
       description: 'Expert laundry service at your doorstep.',
       included: ['Washing and rinsing', 'Drying', 'Folded or hung as per request'],
@@ -47,10 +53,10 @@ const seedServices = async () => {
     },
     { 
       name: 'Steam Ironing', 
-      categoryId: 'cleaning', 
+      categoryId: getCatId('cleaning'), 
       basePrice: 149, 
       duration: '1 hr', 
-      icon: '💨',
+      icon: 'wind',
       image: 'https://images.unsplash.com/photo-1517677208171-0bc6725a3e60?w=500&auto=format&fit=crop&q=60',
       description: 'Professional steam ironing for crisp, wrinkle-free clothes.',
       included: ['Steam pressing', 'Hanger service', 'Minor lint removal'],
@@ -61,10 +67,10 @@ const seedServices = async () => {
     },
     { 
       name: 'Child Care (Babysitter)', 
-      categoryId: 'care', 
+      categoryId: getCatId('care'), 
       basePrice: 599, 
       duration: '4 hrs', 
-      icon: '👶',
+      icon: 'heart',
       image: 'https://images.unsplash.com/photo-1544640808-32cb5eff4380?w=500&auto=format&fit=crop&q=60',
       description: 'Experienced and caring babysitters.',
       included: ['Feeding and care', 'Playtime and engaging activities'],
@@ -76,10 +82,10 @@ const seedServices = async () => {
     },
     { 
       name: 'Home Cook', 
-      categoryId: 'cook', 
+      categoryId: getCatId('cook'), 
       basePrice: 399, 
       duration: '1 hr', 
-      icon: '🧑‍🍳',
+      icon: 'utensils',
       image: 'https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=500&auto=format&fit=crop&q=60',
       description: 'Delicious, hygienic home-cooked meals by verified culinary experts.',
       included: ['Meal preparation', 'Kitchen cleanup'],
@@ -91,10 +97,10 @@ const seedServices = async () => {
     },
     { 
       name: 'Elder Care', 
-      categoryId: 'care', 
+      categoryId: getCatId('care'), 
       basePrice: 699, 
       duration: '8 hrs', 
-      icon: '👴',
+      icon: 'heart',
       image: 'https://images.unsplash.com/photo-1576765608535-5f04d1e3f289?w=500&auto=format&fit=crop&q=60',
       description: 'Compassionate care for the elderly.',
       included: ['Medication reminders', 'Mobility support'],
@@ -106,11 +112,11 @@ const seedServices = async () => {
     },
     { 
       name: 'Electrician (Visit)', 
-      categoryId: 'electrician', 
+      categoryId: getCatId('electrician'), 
       priceType: 'visit',
       basePrice: 199, 
       duration: '1 hr', 
-      icon: '🔌',
+      icon: 'Zap',
       image: 'https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=500&auto=format&fit=crop&q=60',
       description: 'Certified electricians to fix any electrical issue safely.',
       included: ['1 Hour Diagnosis & Basic Repair', 'Safety check post-repair'],
@@ -122,11 +128,11 @@ const seedServices = async () => {
     },
     { 
       name: 'Plumbing (Visit)', 
-      categoryId: 'plumbing', 
+      categoryId: getCatId('plumbing'), 
       priceType: 'visit',
       basePrice: 149, 
       duration: '1 hr', 
-      icon: '🚰',
+      icon: 'droplet',
       image: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=500&auto=format&fit=crop&q=60',
       description: 'Resolve leaks, clogs, and pipe issues fast.',
       included: ['Leak detection', 'Minor pipe/tap repair'],
@@ -138,11 +144,11 @@ const seedServices = async () => {
     },
     { 
       name: 'AC Service & Repair', 
-      categoryId: 'ac', 
+      categoryId: getCatId('ac'), 
       priceType: 'fixed',
       basePrice: 499, 
       duration: '2 hrs', 
-      icon: '❄️',
+      icon: 'wind',
       image: 'https://images.unsplash.com/photo-1620601550785-5df0901ae4f5?w=500&auto=format&fit=crop&q=60',
       description: 'Comprehensive AC servicing covering filter cleaning, gas check, and cooling performance.',
       included: ['Deep coil cleaning', 'Filter wash', 'Refrigerant pressure check'],

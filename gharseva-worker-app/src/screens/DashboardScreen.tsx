@@ -1,6 +1,6 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, Switch, StyleSheet, ScrollView, TouchableOpacity, Alert, SafeAreaView, Image, StatusBar, ActivityIndicator, Modal, TextInput, Vibration } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
+import { View, Text, Switch, StyleSheet, ScrollView, TouchableOpacity, Alert, SafeAreaView, Image, StatusBar, ActivityIndicator, Modal, TextInput, Vibration, RefreshControl } from 'react-native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Audio } from 'expo-av';
 import { io, Socket } from 'socket.io-client';
@@ -82,6 +82,20 @@ export default function DashboardScreen({ onLogout }: { onLogin?: () => void, on
   
   const [activeTab, setActiveTab] = useState<'active' | 'history'>('active');
   const [historyJobs, setHistoryJobs] = useState<any[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Sync data whenever screen comes into focus (e.g. after profile update)
+  useFocusEffect(
+    useCallback(() => {
+      loadWorkerData();
+    }, [])
+  );
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadWorkerData();
+    setRefreshing(false);
+  }, []);
 
   const showToast = (message: string, type: ToastType = 'info') => {
     setToastMessage(message);
@@ -367,7 +381,18 @@ export default function DashboardScreen({ onLogout }: { onLogin?: () => void, on
         </TouchableOpacity>
       )}
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        contentContainerStyle={styles.scrollContent} 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#4F46E5']}
+            tintColor="#4F46E5"
+          />
+        }
+      >
         {/* Earnings Summary Row */}
         <View style={styles.summaryRow}>
            <TouchableOpacity style={styles.summaryCard} onPress={() => navigation.navigate('Profile')}>

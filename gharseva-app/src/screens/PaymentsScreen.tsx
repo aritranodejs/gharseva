@@ -51,9 +51,11 @@ export default function PaymentsScreen({ navigation }: any) {
 
   const fetchMethods = async () => {
     try {
-      const { data } = await api.get('payments/methods');
-      setCards(data.filter((m: any) => m.type === 'card'));
-      const formatUpi = data.filter((m: any) => m.type === 'upi').map((m: any) => {
+      const { data: response } = await api.get('payments/methods');
+      const methodList = response.data || [];
+      
+      setCards(methodList.filter((m: any) => m.type === 'card'));
+      const formatUpi = methodList.filter((m: any) => m.type === 'upi').map((m: any) => {
          const appInfo = UPI_APPS.find(a => a.name === m.brand) || UPI_APPS[3];
          return { id: m._id, upiId: m.identifier, app: m.brand, color: appInfo.color };
       });
