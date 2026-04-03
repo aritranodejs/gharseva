@@ -14,6 +14,7 @@ export default function PackagesScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const [packages, setPackages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [platformSettings, setPlatformSettings] = useState({ isPremiumEnabled: false, isLuxuryEnabled: false });
   
   // Selection State
   const [selectedPkg, setSelectedPkg] = useState<any>(null);
@@ -37,13 +38,42 @@ export default function PackagesScreen({ navigation }: Props) {
   };
 
   useEffect(() => {
-    fetchPackages();
+    fetchData();
   }, []);
+
+  const fetchData = async () => {
+    setLoading(true);
+    await Promise.all([
+      fetchSettings(),
+      fetchPackages()
+    ]);
+    setLoading(false);
+  };
+
+  const fetchSettings = async () => {
+    try {
+      const res = await api.get('public/settings');
+      setPlatformSettings(res.data.data || { isPremiumEnabled: false, isLuxuryEnabled: false });
+    } catch (e) {
+      console.error('Error fetching settings for packages:', e);
+    }
+  };
 
   const fetchPackages = async () => {
     try {
       const response = await api.get('packages');
-      const pkgData = response.data.data;
+      let pkgData = response.data.data;
+      
+      // Filter based on admin settings
+      pkgData = pkgData.filter((pkg: any) => {
+        if (pkg.isPremium && !platformSettings.isPremiumEnabled) return false;
+        // Assuming Luxury check if needed, or if isPremium covers both
+        // For now, if it's marked premium but disabled, hide it.
+        // If we add isLuxury to packages later:
+        if (pkg.isLuxury && !platformSettings.isLuxuryEnabled) return false;
+        return true;
+      });
+
       setPackages(pkgData);
       if (pkgData.length > 0) {
         setSelectedPkg(pkgData[0]);
@@ -54,8 +84,6 @@ export default function PackagesScreen({ navigation }: Props) {
     } catch (error) {
       console.error('Error fetching packages', error);
       showToast('Failed to load packages', 'error');
-    } finally {
-      setLoading(false);
     }
   };
 

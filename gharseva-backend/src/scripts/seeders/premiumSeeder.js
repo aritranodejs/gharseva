@@ -14,6 +14,7 @@ const seedPremium = async () => {
       description: "The ultimate luxury home management plan. Includes dedicated executive pros, priority scheduling, and premium cleaning supplies.",
       icon: "💎",
       isPremium: true,
+      isLuxury: true,
       perks: [
         "Executive Top-Rated Professionals Only",
         "VIP Priority 24/7 Support",

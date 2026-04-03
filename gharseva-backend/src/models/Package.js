@@ -18,6 +18,7 @@ const packageSchema = mongoose.Schema(
       }
     ],
     isPremium: { type: Boolean, default: false },
+    isLuxury: { type: Boolean, default: false },
     perks: [{ type: String }],                        // ["VIP Support", "Priority Pro"]
     isActive: { type: Boolean, default: true },
   },

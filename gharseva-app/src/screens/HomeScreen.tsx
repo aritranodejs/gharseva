@@ -15,8 +15,8 @@ const { width } = Dimensions.get('window');
 
 // Banners with NEW premium images
 const BANNERS = [
-  { id: '1', title: 'Home Deep Cleaning', off: 'UPTO 50% OFF', color: ['#4F46E5', '#818CF8'], image: require('../../assets/cleaning_premium.png') },
-  { id: '2', title: 'AC Servicing', off: 'STARTING @ ₹399', color: ['#059669', '#34D399'], image: require('../../assets/ac_premium.png') },
+  { id: '1', title: 'Home Deep Cleaning', off: 'UPTO 50% OFF', color: ['#4F46E5', '#818CF8'], image: require('../../assets/cleaning_premium.png'), tier: 'premium' },
+  { id: '2', title: 'AC Servicing', off: 'STARTING @ ₹399', color: ['#059669', '#34D399'], image: require('../../assets/ac_premium.png'), tier: 'premium' },
 ];
 
 // Pastel palette for premium category tiles
@@ -567,6 +567,13 @@ export default function HomeScreen() {
                 key={banner.id} 
                 style={[styles.bannerCard, { backgroundColor: banner.color[0] }]} 
                 onPress={() => {
+                  if (banner.tier === 'premium' && !platformSettings.isPremiumEnabled) {
+                    return showToast(`${banner.title} is coming soon! ✨`, 'info');
+                  }
+                  if (banner.tier === 'luxury' && !platformSettings.isLuxuryEnabled) {
+                    return showToast(`${banner.title} is coming soon! 🏰`, 'info');
+                  }
+                  
                   const targetCat = categories.find(c => banner.title.toLowerCase().includes(c.name.toLowerCase()));
                   if (targetCat) {
                     navigation.navigate('CategoryServices', { category: targetCat, pincode, fullAddress: location });
@@ -583,6 +590,13 @@ export default function HomeScreen() {
                   <TouchableOpacity 
                     style={styles.bookNowBtn} 
                     onPress={() => {
+                      if (banner.tier === 'premium' && !platformSettings.isPremiumEnabled) {
+                        return showToast(`${banner.title} is coming soon! ✨`, 'info');
+                      }
+                      if (banner.tier === 'luxury' && !platformSettings.isLuxuryEnabled) {
+                        return showToast(`${banner.title} is coming soon! 🏰`, 'info');
+                      }
+
                       const targetCat = categories.find(c => banner.title.toLowerCase().includes(c.name.toLowerCase()));
                       if (targetCat) {
                         navigation.navigate('CategoryServices', { category: targetCat, pincode, fullAddress: location });
@@ -663,8 +677,10 @@ export default function HomeScreen() {
             style={styles.packageBanner}
             activeOpacity={0.9}
             onPress={() => {
-              const isPackageSoon = !platformSettings.isPremiumEnabled && !platformSettings.isLuxuryEnabled;
-              if (isPackageSoon) {
+              const isPremiumDisabled = !platformSettings.isPremiumEnabled;
+              const isLuxuryDisabled = !platformSettings.isLuxuryEnabled;
+              
+              if (isPremiumDisabled && isLuxuryDisabled) {
                 showToast('Premium Household Packages are Coming Soon! ✨', 'info');
               } else {
                 navigation.navigate('Packages' as any);
