@@ -29,7 +29,7 @@ class BookingService {
     const booking = await this.bookingRepository.findById(bookingId);
     if (!booking) throw new Error('Booking not found');
 
-    if (booking.status !== BOOKING_STATUS.PENDING_ACCEPTANCE) {
+    if (![BOOKING_STATUS.PENDING_ACCEPTANCE, BOOKING_STATUS.SEARCHING].includes(booking.status)) {
       throw new Error('This job is no longer available.');
     }
 
