@@ -221,7 +221,7 @@ export default function HomeScreen() {
       let available = false;
       // Check if current pincode exists in any active area's pincodes array
       for (let area of areas) {
-        if (area.pincodes.includes(pincode)) {
+        if (area.pincodes.some((p: any) => p.pincode === pincode)) {
           available = true;
           break;
         }
@@ -448,7 +448,7 @@ export default function HomeScreen() {
                       </View>
                       <View style={styles.addressInfo}>
                         <Text style={styles.addressLabel}>{area.cityName}</Text>
-                        <Text style={styles.addressText}>{area.pincodes.join(', ')}</Text>
+                        <Text style={styles.addressText}>{area.pincodes.map((p: any) => p.pincode).join(', ')}</Text>
                       </View>
                     </View>
                   ))}
@@ -505,15 +505,22 @@ export default function HomeScreen() {
             </View>
           </TouchableOpacity>
           
-          <TouchableOpacity style={styles.profileBtn} onPress={() => navigation.navigate('Profile')}>
-            <View style={styles.profileIconWrapper}>
-               {profilePic ? (
-                 <Image source={{ uri: profilePic }} style={{ width: 44, height: 44, borderRadius: 22 }} />
-               ) : (
-                 <User size={24} color="#4F46E5" />
-               )}
-            </View>
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', gap: 12 }}>
+            <TouchableOpacity style={styles.profileBtn} onPress={() => navigation.navigate('Notifications')}>
+              <View style={styles.profileIconWrapper}>
+                 <Bell size={24} color="#4F46E5" />
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.profileBtn} onPress={() => navigation.navigate('Profile')}>
+              <View style={styles.profileIconWrapper}>
+                 {profilePic ? (
+                   <Image source={{ uri: profilePic }} style={{ width: 44, height: 44, borderRadius: 22 }} />
+                 ) : (
+                   <User size={24} color="#4F46E5" />
+                 )}
+              </View>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Premium Logo & Search Wrapper */}

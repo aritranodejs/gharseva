@@ -46,6 +46,15 @@ class BookingRepository {
     return await Booking.findByIdAndUpdate(id, update, { new: true });
   }
 
+  async findByIdAndQuery(id, query) {
+    // Find a booking by ID that also matches additional query conditions
+    // Used for secure cancellation to verify ownership
+    return await Booking.findOne({ _id: id, ...query })
+      .populate('serviceId', 'name icon')
+      .populate('userId', 'name profilePicture phoneNumber')
+      .populate('assignedWorkerId', 'name profilePicture rating phoneNumber');
+  }
+
   async countWorkerCompletedJobsToday(workerId) {
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);

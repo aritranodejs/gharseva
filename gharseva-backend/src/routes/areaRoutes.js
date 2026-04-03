@@ -5,5 +5,6 @@ const areaController = require('../controllers/areaController');
 router.get('/', areaController.getAreas);
 router.post('/', areaController.addArea);
 router.put('/:id', areaController.updateArea);
+router.delete('/:id', areaController.deleteArea);
 
 module.exports = router;

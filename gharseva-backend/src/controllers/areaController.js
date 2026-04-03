@@ -33,3 +33,15 @@ exports.updateArea = async (req, res) => {
     return sendError(res, 'Server Error', 500, error.message);
   }
 };
+
+// Delete a serviceable area
+exports.deleteArea = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const area = await ServiceableArea.findByIdAndDelete(id);
+    if (!area) return sendError(res, 'Area not found', 404);
+    return sendSuccess(res, null, 'Area deleted successfully');
+  } catch (error) {
+    return sendError(res, 'Server Error', 500, error.message);
+  }
+};

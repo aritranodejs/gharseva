@@ -322,11 +322,11 @@ export default function OnboardingScreen({ navigation }: any) {
           <Text style={styles.cardSub}>Select your serviceable pincodes.</Text>
 
           <View style={styles.categoryGrid}>
-            {serviceableAreas.map((a) => {
+            {serviceableAreas.reduce((acc: any[], area: any) => [...acc, ...area.pincodes], []).map((a: any) => {
               const isSelected = form.pincodes.includes(a.pincode);
               return (
                 <TouchableOpacity
-                  key={a._id}
+                  key={a.pincode}
                   style={[styles.categoryPill, isSelected && styles.categoryPillActive]}
                   onPress={() => {
                     const newPins = isSelected 
@@ -336,7 +336,10 @@ export default function OnboardingScreen({ navigation }: any) {
                   }}
                 >
                    {isSelected && <CheckCircle2 size={16} color="#4F46E5" style={{ marginRight: 6 }} />}
-                  <Text style={[styles.categoryText, isSelected && styles.categoryTextActive]}>{a.pincode}</Text>
+                  <View>
+                    <Text style={[styles.categoryText, isSelected && styles.categoryTextActive]}>{a.pincode}</Text>
+                    <Text style={{ fontSize: 10, color: '#9CA3AF' }}>{a.name}</Text>
+                  </View>
                 </TouchableOpacity>
               );
             })}

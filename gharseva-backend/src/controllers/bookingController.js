@@ -39,11 +39,11 @@ class BookingController {
     const uploadFiles = req.files || {};
     try {
       const additionalUpdates = {};
-      if (uploadFiles['beforeServiceImages']) {
-        additionalUpdates.beforeServiceImages = uploadFiles['beforeServiceImages'].map(f => `/uploads/${f.filename}`);
+      if (uploadFiles && uploadFiles['beforeServiceImages']) {
+        additionalUpdates.beforeServiceImages = uploadFiles['beforeServiceImages'].map(f => `/uploads/beforeServiceImages/${f.filename}`);
       }
-      if (uploadFiles['afterServiceImages']) {
-        additionalUpdates.afterServiceImages = uploadFiles['afterServiceImages'].map(f => `/uploads/${f.filename}`);
+      if (uploadFiles && uploadFiles['afterServiceImages']) {
+        additionalUpdates.afterServiceImages = uploadFiles['afterServiceImages'].map(f => `/uploads/afterServiceImages/${f.filename}`);
       }
 
       const booking = await bookingService.updateBookingStatus(

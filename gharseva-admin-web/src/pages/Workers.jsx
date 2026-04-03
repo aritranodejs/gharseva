@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Users, Search, Edit3, Trash2, CheckCircle, XCircle, Shield, Phone, Mail, FileText, ExternalLink, Image as ImageIcon, Plus, History, Briefcase, MapPin, Layers, Clock } from 'lucide-react';
+import { Users, Search, Edit3, Trash2, CheckCircle, XCircle, Shield, Phone, Mail, FileText, ExternalLink, Image as ImageIcon, Plus, History, Briefcase, MapPin, Layers, Clock, X } from 'lucide-react';
 import api, { getImageUrl } from '../services/api';
 import Modal from '../components/Modal';
 import Input from '../components/Input';
@@ -37,11 +37,12 @@ const Workers = () => {
       ]);
       setCategories(cats.data.data || []);
       
-      // Flatten all pincodes from all cities and make them unique
+      // Flatten all pincodes from all cities — extract pincode strings from objects
       const allPins = (areas.data.data || []).reduce((acc, city) => {
-        return [...acc, ...(city.pincodes || [])];
+        const pins = (city.pincodes || []).map(p => (typeof p === 'object' ? p.pincode : p));
+        return [...acc, ...pins];
       }, []);
-      const uniquePins = [...new Set(allPins)].sort();
+      const uniquePins = [...new Set(allPins)].filter(Boolean).sort();
       setServiceableAreas(uniquePins);
     } catch (err) {
       console.error('Error fetching support data:', err);
@@ -81,7 +82,8 @@ const Workers = () => {
         phoneNumber: worker.phoneNumber,
         password: '', 
         skills: worker.skills || [],
-        pincodes: worker.pincodes || []
+        // Normalize pincodes to strings in case they're stored as objects
+        pincodes: (worker.pincodes || []).map(p => (typeof p === 'object' ? p.pincode : p)).filter(Boolean)
       });
     } else {
       setSelectedWorker(null);
@@ -127,22 +129,23 @@ const Workers = () => {
     const file = e.target.files[0];
     if (!file) return;
     
-    const reader = new FileReader();
-    reader.onloadend = async () => {
-      setUpdating(true);
-      try {
-        await api.patch(`admin/workers/${selectedWorker._id}`, { [field]: reader.result });
-        const res = await api.get('admin/workers');
-        setWorkers(res.data.data);
-        const updated = res.data.data.find(w => w._id === selectedWorker._id);
-        setSelectedWorker(updated);
-      } catch (err) {
-        alert('Upload failed');
-      } finally {
-        setUpdating(false);
-      }
-    };
-    reader.readAsDataURL(file);
+    setUpdating(true);
+    try {
+      const formData = new FormData();
+      formData.append(field, file);
+      
+      await api.patch(`admin/workers/${selectedWorker._id}`, formData, {
+         headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      const res = await api.get('admin/workers');
+      setWorkers(res.data.data);
+      const updated = res.data.data.find(w => w._id === selectedWorker._id);
+      setSelectedWorker(updated);
+    } catch (err) {
+      alert('Upload failed');
+    } finally {
+      setUpdating(false);
+    }
   };
 
   const handleSaveWorker = async () => {
@@ -248,7 +251,7 @@ const Workers = () => {
                     <td>
                       <div className="contact-cell">
                         <p className="flex items-center gap-1"><Phone size={12} color="#6366F1" /> {worker.phoneNumber}</p>
-                        <p className="flex items-center gap-1 text-xs text-slate-500"><MapPin size={10} /> {worker.pincodes?.slice(0, 2).join(', ')}{worker.pincodes?.length > 2 ? '...' : ''}</p>
+                        <p className="flex items-center gap-1 text-xs text-slate-500"><MapPin size={10} /> {worker.pincodes?.slice(0, 2).map(p => typeof p === 'object' ? p.pincode : p).join(', ')}{worker.pincodes?.length > 2 ? '...' : ''}</p>
                       </div>
                     </td>
                     <td>
@@ -437,25 +440,28 @@ const Workers = () => {
                         onChange={async (e) => {
                             const file = e.target.files[0];
                             if (!file) return;
-                            const reader = new FileReader();
-                            reader.onloadend = async () => {
-                                setUpdating(true);
-                                try {
-                                    const currentDocs = selectedWorker.documents || [];
-                                    await api.patch(`admin/workers/${selectedWorker._id}`, { 
-                                        documents: [...currentDocs, reader.result] 
-                                    });
-                                    const res = await api.get('admin/workers');
-                                    setWorkers(res.data.data);
-                                    const updated = res.data.data.find(w => w._id === selectedWorker._id);
-                                    setSelectedWorker(updated);
-                                } catch (err) {
-                                    alert('Upload failed');
-                                } finally {
-                                    setUpdating(false);
-                                }
-                            };
-                            reader.readAsDataURL(file);
+                            setUpdating(true);
+                            try {
+                                const formData = new FormData();
+                                formData.append('documents', file);
+                                
+                                // Pass existing documents to avoid overriding them if backend requires it
+                                // Or backend can just append it automatically
+                                const currentDocs = selectedWorker.documents || [];
+                                formData.append('existingDocuments', JSON.stringify(currentDocs));
+
+                                await api.patch(`admin/workers/${selectedWorker._id}`, formData, {
+                                    headers: { 'Content-Type': 'multipart/form-data' }
+                                });
+                                const res = await api.get('admin/workers');
+                                setWorkers(res.data.data);
+                                const updated = res.data.data.find(w => w._id === selectedWorker._id);
+                                setSelectedWorker(updated);
+                            } catch (err) {
+                                alert('Upload failed');
+                            } finally {
+                                setUpdating(false);
+                            }
                         }} 
                     />
                   </label>
@@ -547,7 +553,7 @@ const Workers = () => {
                     <span className={`status-pill-small ${job.status}`}>{job.status.replace('_', ' ')}</span>
                   </div>
                   <div className="job-body">
-                    <p className="job-title">{job.serviceName || 'Home Service'}</p>
+                    <p className="job-title">{job.bookingId || `#${job._id.slice(-6)}`} - {job.serviceName || 'Home Service'}</p>
                     <p className="job-price">₹{job.totalAmount} <span className="text-xs text-slate-400">(Earnings: ₹{job.workerEarnings})</span></p>
                     
                     {/* Before/After Gallery */}

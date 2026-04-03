@@ -15,7 +15,9 @@ const Areas = () => {
   // Form State
   const [cityName, setCityName] = useState('');
   const [pincodeInput, setPincodeInput] = useState('');
+  const [areaNameInput, setAreaNameInput] = useState('');
   const [pincodes, setPincodes] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     fetchAreas();
@@ -49,16 +51,18 @@ const Areas = () => {
   };
 
   const handleAddPincode = (e) => {
-    if (e.key === 'Enter' && pincodeInput.trim()) {
-      if (!pincodes.includes(pincodeInput.trim())) {
-        setPincodes([...pincodes, pincodeInput.trim()]);
+    if ((e.key === 'Enter' || e.type === 'click') && pincodeInput.trim() && areaNameInput.trim()) {
+      const exists = pincodes.some(p => p.pincode === pincodeInput.trim());
+      if (!exists) {
+        setPincodes([...pincodes, { pincode: pincodeInput.trim(), name: areaNameInput.trim() }]);
       }
       setPincodeInput('');
+      setAreaNameInput('');
     }
   };
 
-  const removePincode = (pin) => {
-    setPincodes(pincodes.filter(p => p !== pin));
+  const removePincode = (pinCode) => {
+    setPincodes(pincodes.filter(p => p.pincode !== pinCode));
   };
 
   const handleSubmit = async () => {
@@ -99,44 +103,62 @@ const Areas = () => {
         </button>
       </div>
 
-      <div className="content-grid">
-        {loading ? (
-          <div className="loading-state">Loading areas...</div>
-        ) : (
-          areas.map((area) => (
-            <div key={area._id} className="area-card">
-              <div className="area-card-header">
-                <div className="city-info">
-                  <div className="city-icon">
-                    <Globe size={24} color="#4F46E5" />
-                  </div>
-                  <div>
-                    <h3>{area.cityName}</h3>
-                    <p>{area.pincodes?.length || 0} active pincodes</p>
-                  </div>
-                </div>
-                <div className="area-actions">
-                  <button className="btn-icon-sm" onClick={() => handleOpenEdit(area)} title="Manage Pincodes"><Edit3 size={16} /></button>
-                  <button className="btn-icon-sm btn-danger-sm" onClick={() => handleDeleteArea(area._id)} title="Delete Area"><Trash2 size={16} /></button>
-                </div>
-              </div>
-
-              <div className="pincode-grid">
-                {area.pincodes?.map((pin, idx) => (
-                  <div key={idx} className="pincode-badge">
-                    <MapPin size={12} />
-                    <span>{pin}</span>
-                  </div>
-                ))}
-              </div>
-
-              <div className="area-card-footer">
-                <span className="status-indicator online">Service Active</span>
-                <button className="btn-text-primary" onClick={() => handleOpenEdit(area)}>Add/Remove Pincodes</button>
-              </div>
+          <div className="table-actions" style={{ marginBottom: 20 }}>
+            <div className="search-input">
+              <Search size={18} />
+              <input 
+                type="text" 
+                placeholder="Search City, Pincode or Area..." 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
             </div>
-          ))
-        )}
+          </div>
+
+          <div className="content-grid">
+            {areas.filter(area => 
+              area.cityName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+              area.pincodes?.some(p => 
+                (typeof p === 'string' ? p : p.pincode).includes(searchTerm) ||
+                (typeof p === 'object' && p.name?.toLowerCase().includes(searchTerm.toLowerCase()))
+              )
+            ).map((area) => (
+              <div key={area._id} className="area-card">
+                <div className="area-card-header">
+                  <div className="city-info">
+                    <div className="city-icon">
+                      <Globe size={24} color="#4F46E5" />
+                    </div>
+                    <div>
+                      <h3>{area.cityName}</h3>
+                      <p>{area.pincodes?.length || 0} active locations</p>
+                    </div>
+                  </div>
+                  <div className="area-actions">
+                    <button className="btn-icon-sm" onClick={() => handleOpenEdit(area)} title="Manage Pincodes"><Edit3 size={16} /></button>
+                    <button className="btn-icon-sm btn-danger-sm" onClick={() => handleDeleteArea(area._id)} title="Delete Area"><Trash2 size={16} /></button>
+                  </div>
+                </div>
+
+                <div className="pincode-grid detail-mode">
+                  {area.pincodes?.map((p, idx) => (
+                    <div key={idx} className="pincode-badge-v2">
+                      <div className="pin-main">
+                        <MapPin size={12} />
+                        <span className="p-code">{typeof p === 'string' ? p : p.pincode}</span>
+                      </div>
+                      <span className="p-name">{typeof p === 'object' ? p.name : 'Area'}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="area-card-footer">
+                  <span className="status-indicator online">Service Active</span>
+                  <button className="btn-text-primary" onClick={() => handleOpenEdit(area)}>Modify Service Area</button>
+                </div>
+              </div>
+            ))}
+          </div>
 
         {!loading && areas.length === 0 && (
           <div className="empty-state">
@@ -146,7 +168,6 @@ const Areas = () => {
             <button className="btn-secondary" onClick={handleOpenAdd}>Add Your First Area</button>
           </div>
         )}
-      </div>
 
       <Modal 
         isOpen={modalOpen} 
@@ -180,9 +201,19 @@ const Areas = () => {
                     const data = await response.json();
                     
                     if (data[0] && data[0].Status === 'Success') {
-                        const fetchedPins = data[0].PostOffice.map(po => po.Pincode);
-                        const uniquePins = [...new Set([...pincodes, ...fetchedPins])];
-                        setPincodes(uniquePins);
+                        const fetchedPins = data[0].PostOffice.map(po => ({
+                            pincode: po.Pincode,
+                            name: po.Name
+                        }));
+                        
+                        // Merge uniquely by pincode
+                        const merged = [...pincodes];
+                        fetchedPins.forEach(fp => {
+                            if (!merged.find(m => m.pincode === fp.pincode)) {
+                                merged.push(fp);
+                            }
+                        });
+                        setPincodes(merged);
                     } else {
                         alert(`No pincodes found for "${cityName}". Please add manually.`);
                     }
@@ -197,23 +228,34 @@ const Areas = () => {
         </div>
         
         <div className="pincode-manager">
-          <label>Manage Pincodes</label>
-          <div className="pincode-input-wrapper">
-             <input 
-               type="text" 
-               value={pincodeInput} 
-               onChange={(e) => setPincodeInput(e.target.value)}
-               onKeyDown={handleAddPincode}
-               placeholder="Type pincode and press Enter"
-             />
-             <button className="add-pin-btn" onClick={() => handleAddPincode({key: 'Enter'})}><Plus size={16} /></button>
+          <label>Manually Add Area</label>
+          <div className="pincode-input-wrapper-v2">
+             <div className="input-split">
+                <input 
+                    type="text" 
+                    value={pincodeInput} 
+                    onChange={(e) => setPincodeInput(e.target.value)}
+                    placeholder="Pincode"
+                />
+                <input 
+                    type="text" 
+                    value={areaNameInput} 
+                    onChange={(e) => setAreaNameInput(e.target.value)}
+                    onKeyDown={handleAddPincode}
+                    placeholder="Area Name (e.g. Salt Lake)"
+                />
+             </div>
+             <button className="add-pin-btn" onClick={() => handleAddPincode({type: 'click'})}><Plus size={16} /></button>
           </div>
           
-          <div className="pincode-tags">
-            {pincodes.map((pin, idx) => (
-              <div key={idx} className="pin-tag">
-                <span>{pin}</span>
-                <button onClick={() => removePincode(pin)}><X size={12} /></button>
+          <div className="pincode-tags detailed">
+            {pincodes.map((pinObj, idx) => (
+              <div key={idx} className="pin-tag-v2">
+                <div className="pin-tag-info">
+                   <span className="p-code">{typeof pinObj === 'string' ? pinObj : pinObj.pincode}</span>
+                   <span className="p-name">{typeof pinObj === 'object' ? pinObj.name : ''}</span>
+                </div>
+                <button onClick={() => removePincode(typeof pinObj === 'string' ? pinObj : pinObj.pincode)}><X size={12} /></button>
               </div>
             ))}
             {pincodes.length === 0 && <p className="text-xs text-slate-400 mt-2">No pincodes added yet.</p>}

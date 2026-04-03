@@ -81,6 +81,7 @@ class AdminController {
             const bookings = await Booking.find({ status: 'completed' })
                  .populate('userId', 'name phoneNumber')
                  .populate('assignedWorkerId', 'name')
+                 .populate('serviceId', 'name')
                  .sort({ completedAt: -1 });
             
             // Return raw data for frontend to convert to Excel/PDF
@@ -149,7 +150,21 @@ class AdminController {
      */
     async updateWorkerStatus(req, res) {
         try {
-            const worker = await Worker.findByIdAndUpdate(req.params.id, req.body, { new: true });
+            const uploadFiles = req.files || {};
+            const updates = { ...req.body };
+            
+            if (uploadFiles['aadhaarImage']) updates.aadhaarImage = `/uploads/aadhaarImage/${uploadFiles['aadhaarImage'][0].filename}`;
+            if (uploadFiles['panImage']) updates.panImage = `/uploads/panImage/${uploadFiles['panImage'][0].filename}`;
+            if (uploadFiles['policeVerification']) updates.policeVerification = `/uploads/policeVerification/${uploadFiles['policeVerification'][0].filename}`;
+            if (uploadFiles['certification']) updates.certification = `/uploads/certification/${uploadFiles['certification'][0].filename}`;
+            
+            if (uploadFiles['documents']) {
+                const existing = updates.existingDocuments ? JSON.parse(updates.existingDocuments) : [];
+                const newDocs = uploadFiles['documents'].map(d => `/uploads/documents/${d.filename}`);
+                updates.documents = [...existing, ...newDocs];
+            }
+            
+            const worker = await Worker.findByIdAndUpdate(req.params.id, updates, { new: true });
             if (!worker) return sendError(res, 'Worker not found', 404);
             sendSuccess(res, worker, 'Worker status updated');
         } catch (error) {
@@ -165,6 +180,7 @@ class AdminController {
             const bookings = await Booking.find()
                 .populate('userId', 'name phoneNumber')
                 .populate('assignedWorkerId', 'name')
+                .populate('serviceId', 'name')
                 .sort({ createdAt: -1 }); // Most recent first
             sendSuccess(res, bookings);
         } catch (error) {

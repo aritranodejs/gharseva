@@ -40,6 +40,7 @@ const getIcon = (iconName: string, size = 24, color = "#4F46E5") => {
 
 type Booking = {
   _id: string;
+  bookingId?: string;
   serviceId: {
     _id: string;
     name: string;
@@ -186,7 +187,7 @@ export default function BookingScreen({ navigation }: any) {
             </View>
             <View style={styles.textDetails}>
               <Text style={styles.serviceName} numberOfLines={1}>{item.serviceId?.name || 'Service'}</Text>
-              <Text style={styles.bookingId}>ID: #{item._id.slice(-6).toUpperCase()}</Text>
+              <Text style={styles.bookingId}>ID: {item.bookingId || `#${item._id.slice(-6).toUpperCase()}`}</Text>
             </View>
           </View>
           <View style={[styles.statusBadge, { backgroundColor: status.color + '10' }]}>

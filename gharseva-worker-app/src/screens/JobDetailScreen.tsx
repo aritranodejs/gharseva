@@ -17,6 +17,7 @@ const JobDetailScreen = () => {
     const [cancelModalVisible, setCancelModalVisible] = useState(false);
     const [cancelReason, setCancelReason] = useState('');
     const [cancelling, setCancelling] = useState(false);
+    const [previewImage, setPreviewImage] = useState<string | null>(null);
 
     useEffect(() => {
         fetchBookingDetail();
@@ -82,7 +83,7 @@ const JobDetailScreen = () => {
                     <View style={styles.idRow}>
                         <View>
                             <Text style={styles.label}>BOOKING ID</Text>
-                            <Text style={styles.bookingIdText}>#{booking._id.slice(-6).toUpperCase()}</Text>
+                            <Text style={styles.bookingIdText}>{booking.bookingId || `#${booking._id.slice(-6).toUpperCase()}`}</Text>
                         </View>
                         <View style={[styles.statusBadge, { backgroundColor: booking.status === 'completed' ? '#DCFCE7' : '#EEF2FF' }]}>
                             <Text style={[styles.statusText, { color: booking.status === 'completed' ? '#166534' : '#4F46E5' }]}>{booking.status.toUpperCase()}</Text>
@@ -181,7 +182,9 @@ const JobDetailScreen = () => {
                                 <Text style={styles.evidenceTitle}>Before Service</Text>
                                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
                                     {booking.beforeServiceImages.map((img: string, i: number) => (
-                                        <Image key={i} source={{ uri: getImageUrl(img) || undefined }} style={styles.evidenceImage} />
+                                        <TouchableOpacity key={i} onPress={() => setPreviewImage(getImageUrl(img) || null)}>
+                                            <Image source={{ uri: getImageUrl(img) || undefined }} style={styles.evidenceImage} />
+                                        </TouchableOpacity>
                                     ))}
                                 </ScrollView>
                             </View>
@@ -191,7 +194,9 @@ const JobDetailScreen = () => {
                                 <Text style={styles.evidenceTitle}>After Service</Text>
                                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
                                     {booking.afterServiceImages.map((img: string, i: number) => (
-                                        <Image key={i} source={{ uri: getImageUrl(img) || undefined }} style={styles.evidenceImage} />
+                                        <TouchableOpacity key={i} onPress={() => setPreviewImage(getImageUrl(img) || null)}>
+                                            <Image source={{ uri: getImageUrl(img) || undefined }} style={styles.evidenceImage} />
+                                        </TouchableOpacity>
                                     ))}
                                 </ScrollView>
                             </View>
@@ -264,6 +269,18 @@ const JobDetailScreen = () => {
                 </View>
             </Modal>
 
+            {/* Lightbox / Preview Modal */}
+            <Modal visible={!!previewImage} transparent={true} animationType="fade" onRequestClose={() => setPreviewImage(null)}>
+                <View style={styles.lightboxOverlay}>
+                   <TouchableOpacity style={styles.lightboxClose} onPress={() => setPreviewImage(null)}>
+                       <Text style={styles.lightboxCloseText}>Close</Text>
+                   </TouchableOpacity>
+                   {previewImage && (
+                       <Image source={{ uri: previewImage }} style={styles.lightboxImage} resizeMode="contain" />
+                   )}
+                </View>
+            </Modal>
+
             <PremiumToast visible={toastVisible} message={toastMessage} type={toastType} onHide={() => setToastVisible(false)} />
         </View>
     );
@@ -326,7 +343,11 @@ const styles = StyleSheet.create({
     modalConfirmBtn: { backgroundColor: '#EF4444', padding: 16, borderRadius: 16, alignItems: 'center' },
     modalConfirmText: { color: '#FFF', fontWeight: '900', fontSize: 16 },
     modalBackBtn: { padding: 16, borderRadius: 16, alignItems: 'center', backgroundColor: '#F1F5F9' },
-    modalBackText: { color: '#475569', fontWeight: '800', fontSize: 15 }
+    modalBackText: { color: '#475569', fontWeight: '800', fontSize: 15 },
+    lightboxOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' },
+    lightboxClose: { position: 'absolute', top: 60, right: 24, zIndex: 10, padding: 8, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 20 },
+    lightboxCloseText: { color: '#FFF', fontWeight: 'bold' },
+    lightboxImage: { width: '100%', height: '80%' }
 });
 
 export default JobDetailScreen;

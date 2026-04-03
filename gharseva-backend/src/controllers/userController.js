@@ -43,8 +43,8 @@ class UserController {
     try {
       const uploadFiles = req.files || {};
       const updates = { ...req.body };
-      if (uploadFiles['profilePicture']) {
-        updates.profilePicture = `/uploads/${uploadFiles['profilePicture'][0].filename}`;
+      if (uploadFiles && uploadFiles['profilePicture'] && uploadFiles['profilePicture'].length > 0) {
+        updates.profilePicture = `/uploads/profilePicture/${uploadFiles['profilePicture'][0].filename}`;
       }
       const user = await userService.updateProfile(req.user.id, updates);
       sendSuccess(res, user, 'Profile updated successfully');

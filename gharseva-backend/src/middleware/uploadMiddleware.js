@@ -9,7 +9,16 @@ if (!fs.existsSync(uploadDir)) {
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, uploadDir);
+    // Determine subdirectory based on fieldname (or fallback to 'others')
+    const subDirName = file.fieldname ? file.fieldname : 'others';
+    const dynamicDir = path.join(uploadDir, subDirName);
+    
+    // Ensure the subdirectory exists
+    if (!fs.existsSync(dynamicDir)) {
+      fs.mkdirSync(dynamicDir, { recursive: true });
+    }
+    
+    cb(null, dynamicDir);
   },
   filename: function (req, file, cb) {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);

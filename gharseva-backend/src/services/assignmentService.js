@@ -72,7 +72,8 @@ class AssignmentService {
           serviceName: booking.serviceId?.name,
           price: booking.price,
           customerName: booking.userId?.name,
-          customerPicture: booking.userId?.profilePicture
+          customerPicture: booking.userId?.profilePicture,
+          bookingDisplayId: booking.bookingId
         };
 
         eligibleWorkers.slice(0, 3).forEach(async (worker) => {

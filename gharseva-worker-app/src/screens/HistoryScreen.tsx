@@ -75,7 +75,7 @@ export default function HistoryScreen(props: any) {
                       {getIcon(job.serviceId?.icon || '', 24, job.status === 'completed' ? '#10B981' : '#EF4444')}
                     </View>
                     <View style={{ marginLeft: 12 }}>
-                      <Text style={styles.jobIdSmall}>#{job._id.slice(-6).toUpperCase()}</Text>
+                      <Text style={styles.jobIdSmall}>{job.bookingId || `#${job._id.slice(-6).toUpperCase()}`}</Text>
                       <Text style={styles.jobService}>{job.serviceId?.name || 'Service'}</Text>
                     <View style={styles.dateRow}>
                        <Calendar size={12} color="#9CA3AF" />

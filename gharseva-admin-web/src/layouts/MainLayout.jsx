@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, ShoppingBag, MapPin, Users, Settings, LogOut, Menu, X } from 'lucide-react';
+import { LayoutDashboard, ShoppingBag, MapPin, Users, Settings, LogOut, Menu, X, History } from 'lucide-react';
 import './MainLayout.css';
 
 const MainLayout = () => {
@@ -47,6 +47,10 @@ const MainLayout = () => {
           <NavLink to="/workers" onClick={closeSidebar} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
             <Users size={20} />
             <span>Workers</span>
+          </NavLink>
+          <NavLink to="/bookings" onClick={closeSidebar} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
+            <History size={20} />
+            <span>Global History</span>
           </NavLink>
         </nav>
 

@@ -71,6 +71,7 @@ export default function ConfirmationScreen({ route, navigation }: Props) {
   const [upiId, setUpiId] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [confirmedBookingId, setConfirmedBookingId] = useState('');
   const [error, setError] = useState('');
   const [toastVisible, setToastVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
@@ -143,7 +144,7 @@ export default function ConfirmationScreen({ route, navigation }: Props) {
     setError('');
 
     try {
-      await api.post('bookings', {
+      const response = await api.post('bookings', {
         serviceId,
         address: `${selectedAddress.street}, ${selectedAddress.city}`,
         pincode: selectedAddress.pinCode,
@@ -154,6 +155,11 @@ export default function ConfirmationScreen({ route, navigation }: Props) {
         paymentMethod: selectedPayment,
         upiId: selectedPayment === 'upi' ? upiId : undefined
       });
+      
+      if (response.data.success) {
+        setConfirmedBookingId(response.data.data.bookingId);
+        setSuccess(true);
+      }
 
       if (selectedPayment === 'upi' && !savedMethods.find(m => m.identifier === upiId)) {
         try {
@@ -180,6 +186,7 @@ export default function ConfirmationScreen({ route, navigation }: Props) {
             <CheckCircle2 size={100} color="#10B981" />
           </View>
           <Text style={styles.successTitle}>Booking Successful!</Text>
+          <Text style={styles.orderIdBadge}>{confirmedBookingId || 'Processing...'}</Text>
           <Text style={styles.successSub}>
             Your {serviceName} is scheduled. A professional will reach your location tomorrow.
           </Text>
@@ -509,5 +516,6 @@ const styles = StyleSheet.create({
   successBtn: { width: '100%', backgroundColor: '#4F46E5', paddingVertical: 20, borderRadius: 20, alignItems: 'center', shadowColor: '#4F46E5', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.2, shadowRadius: 12, elevation: 5 },
   successBtnText: { color: '#FFF', fontSize: 18, fontWeight: '900' },
   viewBookingBtn: { marginTop: 20 },
-  viewBookingBtnText: { color: '#4F46E5', fontSize: 15, fontWeight: '900' }
+  viewBookingBtnText: { color: '#4F46E5', fontSize: 15, fontWeight: '900' },
+  orderIdBadge: { backgroundColor: '#EEF2FF', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12, color: '#4F46E5', fontWeight: '900', fontSize: 16, marginTop: 16, letterSpacing: 1 }
 });

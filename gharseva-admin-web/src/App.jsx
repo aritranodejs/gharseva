@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard';
 import Services from './pages/Services';
 import Areas from './pages/Areas';
 import Workers from './pages/Workers';
+import Bookings from './pages/Bookings';
 import Settings from './pages/Settings';
 import Login from './pages/Login';
 
@@ -27,6 +28,7 @@ function App() {
             <Route path="services" element={<Services />} />
             <Route path="areas" element={<Areas />} />
             <Route path="workers" element={<Workers />} />
+            <Route path="bookings" element={<Bookings />} />
             <Route path="settings" element={<Settings />} />
           </Route>
         </Route>

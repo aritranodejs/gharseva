@@ -50,11 +50,13 @@ class BookingService {
     if (global.io) {
       global.io.to(`user_${booking.userId}`).emit('booking_confirmed', {
         bookingId: booking._id,
+        bookingDisplayId: booking.bookingId,
         workerName: workerName
       });
       // Broadcast to other workers so they can remove the request banner
       global.io.emit('job_claimed_by_other', {
         bookingId: booking._id,
+        bookingDisplayId: booking.bookingId,
         workerName: workerName
       });
     }
@@ -99,7 +101,7 @@ class BookingService {
       const workerEarnings = booking.price - workerCommissionAmount;
       
       updates.workerEarnings = workerEarnings;
-      // We also store the commission rate used for transparency
+      updates.commissionFee = workerCommissionAmount; // Store explicit Rs. value
       updates.commissionApplied = commissionRate;
 
       await Worker.findByIdAndUpdate(workerId, { 
@@ -116,6 +118,7 @@ class BookingService {
     if (global.io) {
       global.io.to(`user_${booking.userId}`).emit('booking_status_update', { 
         bookingId: booking._id, 
+        bookingDisplayId: booking.bookingId,
         status 
       });
     }
@@ -234,6 +237,7 @@ class BookingService {
       
       global.io.to(targetRoom).emit('booking_cancelled', {
         bookingId: booking._id,
+        bookingDisplayId: booking.bookingId,
         reason,
         cancelledBy
       });

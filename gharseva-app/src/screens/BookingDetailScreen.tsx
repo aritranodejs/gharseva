@@ -197,7 +197,7 @@ export default function BookingDetailScreen({ route, navigation }: any) {
               {booking.status === 'completed' ? <CheckCircle2 size={32} color="#10B981" /> : <Clock3 size={32} color="#4F46E5" />}
            </View>
            <Text style={[styles.statusLabel, { color: getStatusColor(booking.status) }]}>{booking.status.replace('_', ' ').toUpperCase()}</Text>
-           <Text style={styles.bookingId}>Order ID: #{booking._id.slice(-8).toUpperCase()}</Text>
+           <Text style={styles.bookingId}>Order ID: {booking.bookingId || `#${booking._id.slice(-8).toUpperCase()}`}</Text>
         </View>
 
         {/* Service Summary */}

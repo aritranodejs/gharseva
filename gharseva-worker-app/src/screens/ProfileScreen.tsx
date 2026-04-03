@@ -120,10 +120,19 @@ export default function ProfileScreen(props: any) {
     try {
       const res = await api.get('/areas');
       const areasData = res.data?.data || [];
-      const allPins = areasData.reduce((acc: string[], city: any) => {
+      const allPins = areasData.reduce((acc: any[], city: any) => {
         return [...acc, ...(city.pincodes || [])];
       }, []);
-      const uniquePins = [...new Set(allPins)].sort().map(p => ({ pincode: p }));
+      
+      const uniquePins: any[] = [];
+      const seen = new Set();
+      for (const p of allPins) {
+        if (!seen.has(p.pincode)) {
+          seen.add(p.pincode);
+          uniquePins.push(p);
+        }
+      }
+      uniquePins.sort((a, b) => a.pincode.localeCompare(b.pincode));
       setServiceableAreas(uniquePins);
     } catch (err) {
       console.log('Error fetching areas', err);
@@ -678,7 +687,10 @@ export default function ProfileScreen(props: any) {
                             }}
                           >
                              <Text style={styles.categoryIcon}><MapPin size={24} color={isSelected ? "#4F46E5" : "#64748B"} /></Text>
-                             <Text style={[styles.categoryName, isSelected && styles.categoryNameSelected]}>{area.pincode}</Text>
+                             <View>
+                               <Text style={[styles.categoryName, isSelected && styles.categoryNameSelected]}>{area.pincode}</Text>
+                               <Text style={{ fontSize: 10, color: '#9CA3AF', textAlign: 'center' }}>{area.name}</Text>
+                             </View>
                              {isSelected && (
                                 <View style={styles.selectedCheck}>
                                    <Check size={12} color="#FFF" />

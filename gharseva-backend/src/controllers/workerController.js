@@ -6,7 +6,7 @@ class WorkerController {
   async register(req, res) {
     try {
       const uploadFiles = req.files || {};
-      const profilePicUrl = uploadFiles['profilePicture'] ? `/uploads/${uploadFiles['profilePicture'][0].filename}` : '';
+      const profilePicUrl = uploadFiles['profilePicture'] ? `/uploads/profilePicture/${uploadFiles['profilePicture'][0].filename}` : '';
       
       const workerData = {
         name: req.body.name,
@@ -18,11 +18,11 @@ class WorkerController {
         profilePicture: profilePicUrl,
         aadhaarNumber: req.body.aadhaarNumber,
         panNumber: req.body.panNumber,
-        aadhaarImage: uploadFiles['aadhaarImage'] ? `/uploads/${uploadFiles['aadhaarImage'][0].filename}` : '',
-        panImage: uploadFiles['panImage'] ? `/uploads/${uploadFiles['panImage'][0].filename}` : '',
-        policeVerification: uploadFiles['policeVerification'] ? `/uploads/${uploadFiles['policeVerification'][0].filename}` : '',
-        certification: uploadFiles['certification'] ? `/uploads/${uploadFiles['certification'][0].filename}` : '',
-        documents: uploadFiles['documents'] ? uploadFiles['documents'].map(d => `/uploads/${d.filename}`) : []
+        aadhaarImage: uploadFiles['aadhaarImage'] ? `/uploads/aadhaarImage/${uploadFiles['aadhaarImage'][0].filename}` : '',
+        panImage: uploadFiles['panImage'] ? `/uploads/panImage/${uploadFiles['panImage'][0].filename}` : '',
+        policeVerification: uploadFiles['policeVerification'] ? `/uploads/policeVerification/${uploadFiles['policeVerification'][0].filename}` : '',
+        certification: uploadFiles['certification'] ? `/uploads/certification/${uploadFiles['certification'][0].filename}` : '',
+        documents: uploadFiles['documents'] ? uploadFiles['documents'].map(d => `/uploads/documents/${d.filename}`) : []
       };
 
       const newWorker = await workerService.registerWorker(workerData);
@@ -37,19 +37,19 @@ class WorkerController {
       const uploadFiles = req.files || {};
       const updates = { ...req.body };
       if (uploadFiles['profilePicture']) {
-         updates.profilePicture = `/uploads/${uploadFiles['profilePicture'][0].filename}`;
+         updates.profilePicture = `/uploads/profilePicture/${uploadFiles['profilePicture'][0].filename}`;
       }
       if (uploadFiles['aadhaarImage']) {
-         updates.aadhaarImage = `/uploads/${uploadFiles['aadhaarImage'][0].filename}`;
+         updates.aadhaarImage = `/uploads/aadhaarImage/${uploadFiles['aadhaarImage'][0].filename}`;
       }
       if (uploadFiles['panImage']) {
-         updates.panImage = `/uploads/${uploadFiles['panImage'][0].filename}`;
+         updates.panImage = `/uploads/panImage/${uploadFiles['panImage'][0].filename}`;
       }
       if (uploadFiles['policeVerification']) {
-         updates.policeVerification = `/uploads/${uploadFiles['policeVerification'][0].filename}`;
+         updates.policeVerification = `/uploads/policeVerification/${uploadFiles['policeVerification'][0].filename}`;
       }
       if (uploadFiles['certification']) {
-         updates.certification = `/uploads/${uploadFiles['certification'][0].filename}`;
+         updates.certification = `/uploads/certification/${uploadFiles['certification'][0].filename}`;
       }
       const updatedWorker = await workerService.updateWorkerProfile(req.worker._id, updates);
       sendSuccess(res, updatedWorker, 'Profile updated');

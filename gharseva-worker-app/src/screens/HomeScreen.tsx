@@ -40,6 +40,7 @@ const getIcon = (iconName: string, size = 24, color = "#4F46E5") => {
 
 interface BookingRequest {
   bookingId: string;
+  bookingDisplayId?: string;
   pincode: string;
   address: string;
   serviceName: string;
@@ -50,6 +51,7 @@ interface BookingRequest {
 
 interface ActiveJob {
   _id: string;
+  bookingId?: string;
   userId?: {
     name: string;
     profilePicture?: string;
@@ -197,7 +199,7 @@ export default function HomeScreen(props: any) {
     });
 
     socketRef.current.on('booking_cancelled', (data: any) => {
-      showToast(`Booking #${data.bookingId.slice(-6)} was cancelled.`, 'error');
+      showToast(`Booking ${data.bookingDisplayId || `#${data.bookingId.slice(-6)}`} was cancelled.`, 'error');
       fetchActiveJobs();
     });
 
@@ -387,7 +389,7 @@ export default function HomeScreen(props: any) {
           <View style={styles.bannerLeft}>
             <Bell size={20} color="#FFF" />
             <View style={{ marginLeft: 12 }}>
-              <Text style={styles.bannerTitle}>🚀 New Job: {newJobRequest.serviceName}</Text>
+              <Text style={styles.bannerTitle}>🚀 Job {newJobRequest.bookingDisplayId || `#${newJobRequest.bookingId.slice(-6)}`}: {newJobRequest.serviceName}</Text>
               {newJobRequest.customerName && (
                 <View style={styles.customerRowBanner}>
                   <Image
@@ -429,7 +431,7 @@ export default function HomeScreen(props: any) {
                 <View style={styles.serviceBox}>
                   <View style={styles.jobIconBack}>{getIcon(job.serviceId?.icon || '', 24)}</View>
                   <View>
-                    <Text style={styles.jobIdSmall}>#{job._id.slice(-6).toUpperCase()}</Text>
+                    <Text style={styles.jobIdSmall}>{job.bookingId || `#${job._id.slice(-6).toUpperCase()}`}</Text>
                     <Text style={styles.jobService}>{job.serviceId?.name}</Text>
                   </View>
                 </View>
