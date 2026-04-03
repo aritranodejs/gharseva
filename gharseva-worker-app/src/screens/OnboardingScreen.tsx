@@ -459,7 +459,7 @@ export default function OnboardingScreen({ navigation }: any) {
               <View style={{ flex: 1, marginLeft: 12 }}>
                  <Text style={styles.commissionTitle}>Earnings & Commission</Text>
                  <Text style={styles.commissionText}>
-                    GharSeva charges a flat 10% platform commission on your total earnings. No hidden charges.
+                    GharSeva charges a platform commission on your total earnings. No hidden charges.
                  </Text>
               </View>
           </View>

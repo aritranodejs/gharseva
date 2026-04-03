@@ -425,7 +425,7 @@ export default function BookingDetailScreen({ route, navigation }: any) {
                  <Text style={styles.priceValue}>₹{booking.price}</Text>
               </View>
               <View style={styles.priceRow}>
-                 <Text style={styles.priceLabel}>Platform Fee (10%)</Text>
+                 <Text style={styles.priceLabel}>Platform Fee</Text>
                  <Text style={styles.priceValue}>₹{booking.platformFee || Math.round(booking.price * 0.1)}</Text>
               </View>
               <View style={styles.divider} />
