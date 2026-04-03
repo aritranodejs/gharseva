@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const bookingController = require('../controllers/bookingController');
-const { protect, protectAny } = require('../middleware/authMiddleware');
+const { protect, protectWorker, protectAny } = require('../middleware/authMiddleware');
 
 /**
  * @route   POST /api/bookings
@@ -37,5 +37,12 @@ router.patch('/:id/cancel', protectAny, bookingController.cancel);
  * @access  Private (User only)
  */
 router.post('/:id/rebroadcast', protect, bookingController.rebroadcast);
+
+/**
+ * @route   PATCH /api/bookings/:id/worker-cancel
+ * @desc    Worker cancels an assigned job
+ * @access  Private (Worker only)
+ */
+router.patch('/:id/worker-cancel', protectWorker, bookingController.workerCancel);
 
 module.exports = router;

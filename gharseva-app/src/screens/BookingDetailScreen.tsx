@@ -390,7 +390,7 @@ export default function BookingDetailScreen({ route, navigation }: any) {
         )}
 
         {/* Cancellation Section */}
-        {booking.status !== 'cancelled' && booking.status !== 'completed' && (
+        {!['cancelled', 'completed', 'in_progress'].includes(booking.status) && (
            <View style={styles.section}>
               <TouchableOpacity 
                 style={styles.cancelOrderBtn} 

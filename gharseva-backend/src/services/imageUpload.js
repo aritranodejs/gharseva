@@ -54,7 +54,7 @@ const uploadImage = async (base64Data, fileName) => {
     const filePath = path.join(uploadsDir, localFileName);
     fs.writeFileSync(filePath, Buffer.from(base64Clean, 'base64'));
 
-    return `uploads/profiles/${localFileName}`;
+    return `/uploads/profiles/${localFileName}`;
   }
 };
 

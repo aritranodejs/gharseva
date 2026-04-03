@@ -17,6 +17,7 @@ const bookingSchema = mongoose.Schema(
     subscriptionId: { type: mongoose.Schema.Types.ObjectId, ref: 'Subscription' },
     platformFee: { type: Number, default: 0 },   // Added for Revenue Model
     workerEarnings: { type: Number, default: 0 }, // Added for Revenue Model
+    commissionApplied: { type: Number, default: 0 }, // \% used for this job
     totalAmount: { type: Number, default: 0 },    // Base price + platform fee
     paymentMethod: { type: String, enum: ['upi', 'cash', 'card', 'online'], default: 'cash' },
     paymentStatus: { type: String, enum: ['pending', 'paid', 'failed', 'refunded'], default: 'pending' },
@@ -29,6 +30,7 @@ const bookingSchema = mongoose.Schema(
     cancelledAt: { type: Date },
     beforeServiceImages: [{ type: String }],
     afterServiceImages: [{ type: String }],
+    excludedWorkerIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Worker' }],
     completionOtp: { type: String, default: () => Math.floor(1000 + Math.random() * 9000).toString() }
   },
   {

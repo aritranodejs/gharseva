@@ -1,4 +1,5 @@
 const workerService = require('../services/workerService');
+const Worker = require('../models/Worker');
 const { sendSuccess, sendError } = require('../utils/responseHelper');
 
 class WorkerController {
@@ -25,9 +26,9 @@ class WorkerController {
       };
 
       const newWorker = await workerService.registerWorker(workerData);
-      require('../utils/responseHelper').sendSuccess(res, newWorker, 'Registration successful. Waiting for admin approval.', 201);
+      sendSuccess(res, newWorker, 'Registration successful. Waiting for admin approval.', 201);
     } catch (err) {
-      require('../utils/responseHelper').sendError(res, err.message, 400);
+      sendError(res, err.message, 400);
     }
   }
 
@@ -51,9 +52,9 @@ class WorkerController {
          updates.certification = `/uploads/${uploadFiles['certification'][0].filename}`;
       }
       const updatedWorker = await workerService.updateWorkerProfile(req.worker._id, updates);
-      require('../utils/responseHelper').sendSuccess(res, updatedWorker, 'Profile updated');
+      sendSuccess(res, updatedWorker, 'Profile updated');
     } catch (err) {
-      require('../utils/responseHelper').sendError(res, err.message, 400);
+      sendError(res, err.message, 400);
     }
   }
 
@@ -100,7 +101,7 @@ class WorkerController {
     const { token, platform } = req.body;
     try {
       if (!token) return sendError(res, 'Push token required', 400);
-      await require('../models/Worker').findByIdAndUpdate(req.worker._id, { pushToken: token });
+      await Worker.findByIdAndUpdate(req.worker._id, { pushToken: token });
       sendSuccess(res, { token, platform }, 'Push token saved');
     } catch (err) {
       sendError(res, 'Error saving push token');

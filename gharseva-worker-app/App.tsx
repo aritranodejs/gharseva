@@ -16,6 +16,7 @@ import NotificationsScreen from './src/screens/NotificationsScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import PrivacyScreen from './src/screens/PrivacyScreen';
 import HelpScreen from './src/screens/HelpScreen';
+import JobDetailScreen from './src/screens/JobDetailScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -111,6 +112,7 @@ export default function App() {
             <Stack.Screen name="Profile" component={ProfileScreen} />
             <Stack.Screen name="Privacy" component={PrivacyScreen} />
             <Stack.Screen name="Help" component={HelpScreen} />
+            <Stack.Screen name="JobDetail" component={JobDetailScreen} />
           </>
         )}
       </Stack.Navigator>

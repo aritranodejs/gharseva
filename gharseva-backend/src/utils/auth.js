@@ -5,7 +5,7 @@ const jwt = require('jsonwebtoken');
  */
 const generateAccessToken = (id, role = 'user') => {
   return jwt.sign({ id, role }, process.env.JWT_SECRET, {
-    expiresIn: '15m'
+    expiresIn: process.env.JWT_ACCESS_EXPIRY || '15m'
   });
 };
 
@@ -14,7 +14,7 @@ const generateAccessToken = (id, role = 'user') => {
  */
 const generateRefreshToken = (id, role = 'user') => {
   return jwt.sign({ id, role }, process.env.JWT_SECRET, {
-    expiresIn: '7d'
+    expiresIn: process.env.JWT_REFRESH_EXPIRY || '7d'
   });
 };
 

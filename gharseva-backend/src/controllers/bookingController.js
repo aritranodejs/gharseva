@@ -1,4 +1,5 @@
 const bookingService = require('../services/bookingService');
+const assignmentService = require('../services/assignmentService');
 const { sendSuccess, sendError } = require('../utils/responseHelper');
 
 class BookingController {
@@ -62,7 +63,6 @@ class BookingController {
   async create(req, res) {
     try {
       const booking = await bookingService.createUserBooking(req.user.id, req.body);
-      const assignmentService = require('../services/assignmentService');
       assignmentService.assignWorkerToBooking(booking._id).catch(console.error);
       
       sendSuccess(res, booking, 'Booking created', 201);
@@ -116,7 +116,6 @@ class BookingController {
   async rebroadcast(req, res) {
     try {
       const { id } = req.params;
-      const assignmentService = require('../services/assignmentService');
       
       // Verification: only the user who created it can rebroadcast
       const booking = await bookingService.getBookingById(id, req.user.id);
@@ -129,6 +128,20 @@ class BookingController {
       assignmentService.assignWorkerToBooking(id).catch(err => console.error('[Rebroadcast Error]', err));
       
       sendSuccess(res, null, 'Re-broadcasted to nearby professionals.');
+    } catch (err) {
+      sendError(res, err.message, 400);
+    }
+  }
+
+  async workerCancel(req, res) {
+    const { reason } = req.body;
+    try {
+      const booking = await bookingService.workerCancelBooking(
+        req.params.id,
+        req.worker._id,
+        reason
+      );
+      sendSuccess(res, booking, 'Job cancelled. Re-searching for a professional.');
     } catch (err) {
       sendError(res, err.message, 400);
     }

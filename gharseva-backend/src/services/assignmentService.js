@@ -21,6 +21,7 @@ class AssignmentService {
       const isTrustService = booking.serviceId?.isTrustService;
 
       const query = {
+        _id: { $nin: booking.excludedWorkerIds || [] },
         isOnline: true,
         isActive: true,
         categories: categoryId,

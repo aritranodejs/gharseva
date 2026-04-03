@@ -17,7 +17,9 @@ const serviceSchema = mongoose.Schema(
     rating: { type: Number, default: 4.8 },
     reviewsCount: { type: Number, default: 0 },
     isTrustService: { type: Boolean, default: false },
-    isSkilledService: { type: Boolean, default: false }
+    isSkilledService: { type: Boolean, default: false },
+    isPremium: { type: Boolean, default: false },
+    isLuxury: { type: Boolean, default: false }
   },
   {
     timestamps: true,

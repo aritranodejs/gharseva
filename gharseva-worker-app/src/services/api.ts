@@ -5,11 +5,10 @@ import { Platform } from 'react-native';
 // In development, use physical device IP or localhost for emulator
 // We prioritize the environment variable if set by Expo
 const getBaseURL = () => {
-  if (process.env.EXPO_PUBLIC_API_URL) return process.env.EXPO_PUBLIC_API_URL;
-  
-  // High-priority fallback to the user's current development IP
-  const devIp = '192.168.1.6'; 
-  return `http://${devIp}:5000/api/`;
+  const envUrl = process.env.EXPO_PUBLIC_API_URL;
+  if (envUrl) return envUrl;
+
+  return 'http://127.0.0.1:5000/api/';
 };
 
 export const API_URL = getBaseURL();

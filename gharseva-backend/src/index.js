@@ -11,7 +11,12 @@ connectDB();
 const app = express();
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+  credentials: true
+}));
 app.use(express.json({ limit: '10mb' })); // Support large base64 images
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
@@ -43,6 +48,8 @@ app.use('/api/packages', require('./routes/packages'));
 app.use('/api/subscriptions', require('./routes/subscriptions'));
 app.use('/api/workers', require('./routes/workers'));
 app.use('/api/areas', require('./routes/areaRoutes'));
+app.use('/api/public', require('./routes/public'));
+app.use('/api/admin', require('./routes/admin'));
 
 // Catch-all Error// 404 Handler
 app.use((req, res, next) => {
@@ -71,6 +78,12 @@ io.on('connection', (socket) => {
     console.log(`[Socket.io] Worker ${workerId} joined their dispatch room`);
   });
 
+  // Customer registers its UserId on connecting
+  socket.on('register_user', (userId) => {
+    socket.join(`user_${userId}`);
+    console.log(`[Socket.io] User ${userId} joined their notification room`);
+  });
+
   // Worker sends live location update
   socket.on('update_location', async (data) => {
     const Worker = require('./models/Worker');
@@ -94,6 +107,6 @@ io.on('connection', (socket) => {
   });
 });
 
-server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT} with Socket.io active`);
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running on http://0.0.0.0:${PORT} with Socket.io active`);
 });

@@ -60,6 +60,7 @@ export default function HomeScreen() {
   const [categories, setCategories] = useState<any[]>([]);
   const [serviceableAreas, setServiceableAreas] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [platformSettings, setPlatformSettings] = useState({ isPremiumEnabled: false, isLuxuryEnabled: false });
   const [refreshing, setRefreshing] = useState(false);
   const [location, setLocation] = useState('New Town, Kolkata');
   const [pincode, setPincode] = useState('700156'); // Default to New Town
@@ -104,6 +105,16 @@ export default function HomeScreen() {
 
     const SOCKET_URL = api.defaults.baseURL?.replace('/api', '') || 'http://192.168.1.6:5000';
     socketRef.current = io(SOCKET_URL, { auth: { token } });
+
+    // Identify user to the socket server for targeted notifications
+    const userDataStr = await AsyncStorage.getItem('userData');
+    if (userDataStr) {
+      const userData = JSON.parse(userDataStr);
+      if (userData._id) {
+        socketRef.current.emit('register_user', userData._id);
+        console.log('[Socket.io] Registered user room:', userData._id);
+      }
+    }
 
     socketRef.current.on('new_notification', async (notif: any) => {
       // Short ping sound
@@ -153,7 +164,8 @@ export default function HomeScreen() {
     await Promise.all([
       fetchCategories(),
       fetchAreasAndServices(),
-      fetchSavedAddresses()
+      fetchSavedAddresses(),
+      fetchSettings()
     ]);
     setLoading(false);
   };
@@ -163,16 +175,24 @@ export default function HomeScreen() {
       const response = await api.get('auth/profile');
       const profileData = response.data.data;
       setSavedAddresses(profileData.addresses || []);
-      // Set profile picture from API
       if (profileData.profilePicture) {
         setProfilePic(getImageUrl(profileData.profilePicture));
       }
     } catch (error: any) {
        console.error('Error fetching addresses for home:', error);
-       if (error.response?.status === 401 || error.message?.includes('token') || error.message?.includes('401')) {
+       if (error.response?.status === 401) {
          await AsyncStorage.multiRemove(['userAccessToken', 'userRefreshToken', 'userData']);
          navigation.reset({ index: 0, routes: [{ name: 'Auth' }] });
        }
+    }
+  };
+
+  const fetchSettings = async () => {
+    try {
+      const res = await api.get('public/settings');
+      setPlatformSettings(res.data.data || { isPremiumEnabled: false, isLuxuryEnabled: false });
+    } catch (e) {
+      console.error('Error fetching settings for visibility:', e);
     }
   };
 
@@ -184,6 +204,12 @@ export default function HomeScreen() {
        console.error('Error fetching categories:', error);
     }
   };
+
+  const filteredCategories = categories.filter(cat => {
+    if (cat.isPremium && !platformSettings.isPremiumEnabled) return false;
+    if (cat.isLuxury && !platformSettings.isLuxuryEnabled) return false;
+    return true;
+  });
 
   const fetchAreasAndServices = async () => {
     try {
@@ -537,13 +563,34 @@ export default function HomeScreen() {
             }}
           >
             {BANNERS.map((banner) => (
-              <TouchableOpacity key={banner.id} style={[styles.bannerCard, { backgroundColor: banner.color[0] }]} onPress={() => navigation.navigate('Packages' as any)}>
+              <TouchableOpacity 
+                key={banner.id} 
+                style={[styles.bannerCard, { backgroundColor: banner.color[0] }]} 
+                onPress={() => {
+                  const targetCat = categories.find(c => banner.title.toLowerCase().includes(c.name.toLowerCase()));
+                  if (targetCat) {
+                    navigation.navigate('CategoryServices', { category: targetCat, pincode, fullAddress: location });
+                  } else {
+                    navigation.navigate('Packages' as any);
+                  }
+                }}
+              >
                 <Image source={banner.image} style={styles.bannerImage} resizeMode="cover" />
                 <View style={[styles.bannerOverlay, { backgroundColor: banner.color[0] + 'CC' }]} />
                 <View style={styles.bannerTextContainer}>
                   <Text style={styles.bannerOff}>{banner.off}</Text>
                   <Text style={styles.bannerTitle}>{banner.title}</Text>
-                  <TouchableOpacity style={styles.bookNowBtn} onPress={() => navigation.navigate('Packages' as any)}>
+                  <TouchableOpacity 
+                    style={styles.bookNowBtn} 
+                    onPress={() => {
+                      const targetCat = categories.find(c => banner.title.toLowerCase().includes(c.name.toLowerCase()));
+                      if (targetCat) {
+                        navigation.navigate('CategoryServices', { category: targetCat, pincode, fullAddress: location });
+                      } else {
+                        navigation.navigate('Packages' as any);
+                      }
+                    }}
+                  >
                     <Text style={styles.bookNowText}>Book Now</Text>
                   </TouchableOpacity>
                 </View>
@@ -578,13 +625,10 @@ export default function HomeScreen() {
                 onPress={() => {
                   if (!isAvailable) return showToast('We are not yet serving in this area.', 'info');
                   
-                  const isComingSoon = category.name.toLowerCase().includes('premium') || 
-                                      category.name.toLowerCase().includes('luxury') ||
-                                      category.name.toLowerCase().includes('vip') ||
-                                      ['Spa', 'Massage'].some(s => category.name.includes(s));
+                  const isComingSoon = ['Spa', 'Massage'].some(s => category.name.includes(s));
                   
                   if (isComingSoon) {
-                    showToast(`${category.name} is Coming Soon! 🚀`, 'info');
+                    showToast(`${category.name} is coming soon! 🚀`, 'info');
                     return;
                   }
 
@@ -597,11 +641,15 @@ export default function HomeScreen() {
                   });
                 }}
               >
-                <View style={styles.categoryIconContainer}>
-                  {catImg ? (
+                <View style={[styles.categoryIconContainer, category.isPremium && styles.premiumContainer, category.isLuxury && styles.luxuryContainer]}>
+                  {category.isPremium && <View style={styles.premiumBadge}><Text style={styles.premiumBadgeText}>PREMIUM</Text></View>}
+                  {category.isLuxury && <View style={styles.luxuryBadge}><Text style={styles.premiumBadgeText}>LUXURY</Text></View>}
+                  {category.image ? (
+                    <Image source={{ uri: category.image }} style={styles.categoryImgFull} />
+                  ) : catImg ? (
                     <Image source={catImg} style={styles.categoryImgFull} />
                   ) : (
-                    getIcon(category.icon, 30, category.iconColor || "#4F46E5")
+                    getIcon(category.icon, 34, category.iconColor || "#4F46E5")
                   )}
                 </View>
                 <Text style={styles.categoryName} numberOfLines={2}>{category.name}</Text>
@@ -614,7 +662,14 @@ export default function HomeScreen() {
          <TouchableOpacity 
             style={styles.packageBanner}
             activeOpacity={0.9}
-            onPress={() => showToast('Premium Household Packages are Coming Soon! ✨', 'info')}
+            onPress={() => {
+              const isPackageSoon = !platformSettings.isPremiumEnabled && !platformSettings.isLuxuryEnabled;
+              if (isPackageSoon) {
+                showToast('Premium Household Packages are Coming Soon! ✨', 'info');
+              } else {
+                navigation.navigate('Packages' as any);
+              }
+            }}
          >
            <Image source={require('../../assets/cleaning_premium_v2.png')} style={styles.packageBannerBg} />
            <View style={styles.packageBannerOverlay} />
@@ -649,11 +704,9 @@ export default function HomeScreen() {
               onPress={() => {
                 if (!isAvailable) return showToast('We are not yet serving in this area.', 'info');
                 
-                const isPremium = service.name.toLowerCase().includes('premium') || 
-                                 service.name.toLowerCase().includes('luxury') ||
-                                 service.name.toLowerCase().includes('vip');
+                const comingSoon = false; // Always allow if serviceable
                 
-                if (isPremium) return showToast('Premium services are coming soon! ✨', 'info');
+                if (comingSoon) return showToast(`${service.name} is coming soon! ✨`, 'info');
 
                 navigation.navigate('ServiceDetail', {
                   service,
@@ -702,11 +755,9 @@ export default function HomeScreen() {
                   onPress={() => {
                     if (!isAvailable) return showToast('We are not yet serving in this area.', 'info');
                     
-                    const isPremium = service.name.toLowerCase().includes('premium') || 
-                                     service.name.toLowerCase().includes('luxury') ||
-                                     service.name.toLowerCase().includes('vip');
+                    const comingSoon = false;
                     
-                    if (isPremium) return showToast('Premium services are coming soon! ✨', 'info');
+                    if (comingSoon) return showToast(`${service.name} is coming soon! ✨`, 'info');
 
                     navigation.navigate('ServiceDetail', {
                       service,
@@ -809,9 +860,15 @@ const styles = StyleSheet.create({
   seeAll: { color: '#4F46E5', fontWeight: '800', fontSize: 14 },
   categoriesGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 12, marginBottom: 32 },
   categoryItem: { width: '25%', alignItems: 'center', marginBottom: 28, paddingHorizontal: 4 },
-  categoryIconContainer: { width: 68, height: 68, borderRadius: 22, justifyContent: 'center', alignItems: 'center', marginBottom: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 3, overflow: 'hidden' },
-  categoryImgFull: { width: '100%', height: '100%' },
+  categoryIconContainer: { width: 72, height: 72, borderRadius: 24, justifyContent: 'center', alignItems: 'center', marginBottom: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.07, shadowRadius: 10, elevation: 3, overflow: 'visible' },
+  categoryImgFull: { width: '100%', height: '100%', borderRadius: 24 },
   categoryName: { fontSize: 11, color: '#1F2937', fontWeight: '700', textAlign: 'center', lineHeight: 15 },
+  
+  premiumContainer: { borderColor: '#F59E0B', borderWidth: 2, backgroundColor: '#FFFBEB' },
+  luxuryContainer: { borderColor: '#7C3AED', borderWidth: 2, backgroundColor: '#F5F3FF' },
+  premiumBadge: { position: 'absolute', top: -10, backgroundColor: '#F59E0B', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, zIndex: 50 },
+  luxuryBadge: { position: 'absolute', top: -10, backgroundColor: '#7C3AED', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, zIndex: 50 },
+  premiumBadgeText: { fontSize: 8, color: '#FFF', fontWeight: '900' },
   servicesList: { paddingHorizontal: 20 },
   recListContent: { paddingLeft: 20, paddingBottom: 32 },
   recCard: { width: 160, height: 220, borderRadius: 24, marginRight: 16, overflow: 'hidden', backgroundColor: '#F3F4F6' },

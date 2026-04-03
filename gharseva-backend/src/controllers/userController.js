@@ -1,12 +1,23 @@
 const userService = require('../services/userService');
+const smsService = require('../services/smsService');
 const { sendSuccess, sendError } = require('../utils/responseHelper');
+const tokenStore = require('../utils/tokenStore');
 
 class UserController {
   async sendOtp(req, res) {
     const { phoneNumber } = req.body;
     if (!phoneNumber) return sendError(res, 'Phone number is required', 400);
-    // Mock sending OTP
-    sendSuccess(res, null, 'OTP sent successfully (mock: 123456)');
+
+    // Generate random 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Store in tokenStore for 5 minutes
+    await tokenStore.set(`otp_${phoneNumber}`, otp, 300);
+
+    // Send via SMS Service (toggles between MOCK and REAL in .env)
+    await smsService.sendOtp(phoneNumber, otp);
+
+    sendSuccess(res, null, `OTP sent successfully.`);
   }
 
   async verifyOtp(req, res) {
@@ -33,7 +44,7 @@ class UserController {
       const uploadFiles = req.files || {};
       const updates = { ...req.body };
       if (uploadFiles['profilePicture']) {
-         updates.profilePicture = `/uploads/${uploadFiles['profilePicture'][0].filename}`;
+        updates.profilePicture = `/uploads/${uploadFiles['profilePicture'][0].filename}`;
       }
       const user = await userService.updateProfile(req.user.id, updates);
       sendSuccess(res, user, 'Profile updated successfully');

@@ -5,9 +5,11 @@ import { Platform } from 'react-native';
 // Standard fallback if .env is missing. For Android emulator, host localhost is 10.0.2.2
 // Using user's current dev IP 192.168.1.6
 const getBaseURL = () => {
-  if (process.env.EXPO_PUBLIC_API_URL) return process.env.EXPO_PUBLIC_API_URL;
-  const devIp = '192.168.1.6'; 
-  return `http://${devIp}:5000/api/`;
+  const envUrl = process.env.EXPO_PUBLIC_API_URL;
+  if (envUrl) return envUrl;
+  
+  // Generic fallback for local development if .env is missing
+  return 'http://127.0.0.1:5000/api/';
 };
 
 const API_URL = getBaseURL();

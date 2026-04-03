@@ -22,6 +22,14 @@ class ServiceRepository {
   async findPackageById(id) {
     return await Package.findById(id).populate('services');
   }
+
+  async update(id, data) {
+    return await Service.findByIdAndUpdate(id, data, { new: true });
+  }
+
+  async delete(id) {
+    return await Service.findByIdAndDelete(id);
+  }
 }
 
 module.exports = new ServiceRepository();

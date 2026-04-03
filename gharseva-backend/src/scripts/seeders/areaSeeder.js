@@ -10,11 +10,26 @@ const seedAreas = async () => {
       return;
     }
 
-    const area = await ServiceableArea.create({
-      cityName: "Kolkata (New Town)",
-      pincodes: ["700156", "700135", "700157"],
-      isActive: true
-    });
+    const areas = [
+      {
+        cityName: "Kolkata (New Town/Salt Lake)",
+        pincodes: ["700156", "700135", "700157", "700091", "700102"],
+        isActive: true
+      },
+      {
+        cityName: "Bidhannagar",
+        pincodes: ["700064", "700097", "700098"],
+        isActive: true
+      }
+    ];
+
+    for (const areaData of areas) {
+      await ServiceableArea.findOneAndUpdate(
+        { cityName: areaData.cityName },
+        areaData,
+        { upsert: true, new: true }
+      );
+    }
 
     console.log("Serviceable Area Seeded:", area.cityName);
   } catch (error) {

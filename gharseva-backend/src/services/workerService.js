@@ -1,5 +1,6 @@
 const workerRepository = require('../repositories/workerRepository');
 const { generateTokens } = require('../utils/auth');
+const tokenStore = require('../utils/tokenStore');
 
 class WorkerService {
   async authenticate(phoneNumber, password) {
@@ -19,7 +20,6 @@ class WorkerService {
     }
 
     const tokens = generateTokens(worker._id, 'worker');
-    const tokenStore = require('../utils/tokenStore');
     await tokenStore.set(`rf_${tokens.refreshToken}`, worker._id.toString(), 7 * 24 * 60 * 60); // 7 days
 
     return {

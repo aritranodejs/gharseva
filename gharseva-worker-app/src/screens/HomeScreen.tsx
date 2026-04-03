@@ -24,7 +24,7 @@ const Help = HelpIcon as any;
 const ShieldCheck = ShieldCheckIcon as any;
 
 const getIcon = (iconName: string, size = 24, color = "#4F46E5") => {
-  const icons: any = { 
+  const icons: any = {
     Zap, Droplets, Sparkles, Hammer, Snowflake, ShieldCheck, User, Utensils, Clock, Star, MapPinIcon, Bell, Briefcase, Wallet, ChevronRight: ChevronRightIcon, Help, Heart, Wind,
     'sparkles': Sparkles,
     'utensils': Utensils,
@@ -88,11 +88,11 @@ export default function HomeScreen(props: any) {
   const socketRef = useRef<Socket | null>(null);
   const soundRef = useRef<Audio.Sound | null>(null);
   const notifSubRef = useRef<any>(null);
-  
+
   const [toastVisible, setToastVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState<ToastType>('info');
-  
+
   const [completeModalVisible, setCompleteModalVisible] = useState(false);
   const [completionPin, setCompletionPin] = useState('');
   const [completing, setCompleting] = useState(false);
@@ -127,7 +127,7 @@ export default function HomeScreen(props: any) {
         acceptJobRequest(data.bookingId as string);
       }
     });
-    
+
     return () => {
       if (socketRef.current) socketRef.current.disconnect();
       if (notifSubRef.current) notifSubRef.current.remove();
@@ -191,7 +191,7 @@ export default function HomeScreen(props: any) {
           { shouldPlay: true, isLooping: true }
         );
         soundRef.current = sound;
-      } catch (e) {}
+      } catch (e) { }
       const earnings = bookingData.price - Math.round(bookingData.price * 0.1);
       showJobNotification(bookingData.serviceName, bookingData.address, earnings, bookingData.bookingId);
     });
@@ -210,10 +210,10 @@ export default function HomeScreen(props: any) {
   const startLocationTracking = async () => {
     const coords = await getCurrentWorkerLocation();
     if (!coords) {
-       showToast('Location permission is required to receive nearby jobs.', 'error');
-       setLoading(false);
-       setRefreshing(false);
-       return;
+      showToast('Location permission is required to receive nearby jobs.', 'error');
+      setLoading(false);
+      setRefreshing(false);
+      return;
     }
     if (coords && socketRef.current) {
       socketRef.current.emit('update_location', { workerId: workerData?._id, lat: coords.lat, lng: coords.lng });
@@ -225,7 +225,7 @@ export default function HomeScreen(props: any) {
   const stopAlert = async () => {
     Vibration.cancel();
     if (soundRef.current) {
-      try { await soundRef.current.stopAsync(); await soundRef.current.unloadAsync(); } catch (_) {}
+      try { await soundRef.current.stopAsync(); await soundRef.current.unloadAsync(); } catch (_) { }
       soundRef.current = null;
     }
     clearJobNotifications();
@@ -276,24 +276,24 @@ export default function HomeScreen(props: any) {
     }
 
     try {
-       if (status === 'in_progress') {
-          const formData = new FormData();
-          formData.append('status', status);
-          images.forEach((img, index) => {
-            formData.append('beforeServiceImages', {
-              uri: img.uri,
-              type: 'image/jpeg',
-              name: `before_${index}.jpg`
-            } as any);
-          });
-          await api.post(`/workers/bookings/${bookingId}/status`, formData, {
-            headers: { 'Content-Type': 'multipart/form-data' }
-          });
-       } else {
-          await api.post(`/workers/bookings/${bookingId}/status`, { status });
-       }
-       showToast(`Job marked as ${status.replace('_', ' ')}`, 'success');
-       fetchActiveJobs();
+      if (status === 'in_progress') {
+        const formData = new FormData();
+        formData.append('status', status);
+        images.forEach((img, index) => {
+          formData.append('beforeServiceImages', {
+            uri: img.uri,
+            type: 'image/jpeg',
+            name: `before_${index}.jpg`
+          } as any);
+        });
+        await api.post(`/workers/bookings/${bookingId}/status`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+      } else {
+        await api.post(`/workers/bookings/${bookingId}/status`, { status });
+      }
+      showToast(`Job marked as ${status.replace('_', ' ')}`, 'success');
+      fetchActiveJobs();
     } catch (err: any) {
       showToast('Failed to update status.', 'error');
     }
@@ -315,7 +315,7 @@ export default function HomeScreen(props: any) {
 
   const handleCompleteJob = async () => {
     if (!completionPin || completionPin.length !== 4) return showToast('Enter 4-digit PIN', 'error');
-    
+
     const images = serviceImages[selectedJobId!]?.after || [];
     if (images.length === 0) return showToast('Please take an "After Service" photo.', 'error');
 
@@ -335,7 +335,7 @@ export default function HomeScreen(props: any) {
       await api.post(`/workers/bookings/${selectedJobId}/status`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
-      
+
       showToast('Job completed!', 'success');
       setCompleteModalVisible(false);
       setCompletionPin('');
@@ -352,70 +352,70 @@ export default function HomeScreen(props: any) {
       <StatusBar barStyle="dark-content" />
       <View style={styles.header}>
         <TouchableOpacity style={styles.userInfo} onPress={() => navigation.navigate('Profile')}>
-           <Image 
-             source={{ uri: (getImageUrl(workerData?.profilePicture) || 'https://via.placeholder.com/100') as string }} 
-             style={styles.avatar} 
-           />
-           <View style={styles.userText}>
-              <Text style={styles.greeting}>Howdy, {workerData?.name?.split(' ')[0] || 'Partner'}</Text>
-              <View style={styles.ratingRow}>
-                 <Star size={12} color="#F59E0B" fill="#F59E0B" />
-                 <Text style={styles.ratingText}>{workerData?.rating || '4.8'} • Top Pro</Text>
-              </View>
-           </View>
+          <Image
+            source={{ uri: (getImageUrl(workerData?.profilePicture) || 'https://via.placeholder.com/100') as string }}
+            style={styles.avatar}
+          />
+          <View style={styles.userText}>
+            <Text style={styles.greeting}>Welcome, {workerData?.name?.split(' ')[0] || 'Partner'}</Text>
+            <View style={styles.ratingRow}>
+              <Star size={12} color="#F59E0B" fill="#F59E0B" />
+              <Text style={styles.ratingText}>{workerData?.rating || '4.8'} • Top Pro</Text>
+            </View>
+          </View>
         </TouchableOpacity>
         <TouchableOpacity style={styles.notifyBtn} onPress={() => navigation.navigate('Notifications')}>
-           <Bell size={24} color="#111827" />
-           <View style={styles.badge} />
+          <Bell size={24} color="#111827" />
+          <View style={styles.badge} />
         </TouchableOpacity>
       </View>
 
       <View style={styles.onlineCard}>
-         <View style={styles.onlineInfo}>
-            <View style={[styles.pulse, { backgroundColor: isOnline ? '#10B981' : '#9CA3AF' }]} />
-            <Text style={styles.onlineTitle}>{isOnline ? 'Online & Active' : 'Offline'}</Text>
-         </View>
-         <Switch 
-            value={isOnline} 
-            onValueChange={(val) => { setIsOnline(val); api.post('/workers/online', { isOnline: val }).catch(console.error); }} 
-            trackColor={{ false: '#E5E7EB', true: '#A7F3D0' }} thumbColor={isOnline ? '#10B981' : '#FFFFFF'}
-          />
+        <View style={styles.onlineInfo}>
+          <View style={[styles.pulse, { backgroundColor: isOnline ? '#10B981' : '#9CA3AF' }]} />
+          <Text style={styles.onlineTitle}>{isOnline ? 'Online & Active' : 'Offline'}</Text>
+        </View>
+        <Switch
+          value={isOnline}
+          onValueChange={(val) => { setIsOnline(val); api.post('/workers/online', { isOnline: val }).catch(console.error); }}
+          trackColor={{ false: '#E5E7EB', true: '#A7F3D0' }} thumbColor={isOnline ? '#10B981' : '#FFFFFF'}
+        />
       </View>
 
       {newJobRequest && (
         <TouchableOpacity style={styles.newJobBanner} onPress={() => acceptJobRequest(newJobRequest.bookingId)}>
-           <View style={styles.bannerLeft}>
-              <Bell size={20} color="#FFF" />
-              <View style={{ marginLeft: 12 }}>
-                  <Text style={styles.bannerTitle}>🚀 New Job: {newJobRequest.serviceName}</Text>
-                  {newJobRequest.customerName && (
-                    <View style={styles.customerRowBanner}>
-                       <Image 
-                         source={{ uri: (getImageUrl(newJobRequest.customerPicture) || 'https://via.placeholder.com/20') as string }} 
-                         style={styles.customerAvatarBanner} 
-                       />
-                       <Text style={styles.customerNameBanner}>{newJobRequest.customerName}</Text>
-                       <View style={styles.verifiedTagSmall}><ShieldCheck size={8} color="#A7F3D0" /><Text style={styles.verifiedTextSmall}>VERIFIED</Text></View>
-                    </View>
-                  )}
-                  <Text style={styles.bannerSub} numberOfLines={1}>{newJobRequest.address}</Text>
-                  <Text style={[styles.bannerSub, { color: '#A7F3D0', marginTop: 2 }]}>Claim for ₹{newJobRequest.price - Math.round(newJobRequest.price * 0.1)}</Text>
-               </View>
+          <View style={styles.bannerLeft}>
+            <Bell size={20} color="#FFF" />
+            <View style={{ marginLeft: 12 }}>
+              <Text style={styles.bannerTitle}>🚀 New Job: {newJobRequest.serviceName}</Text>
+              {newJobRequest.customerName && (
+                <View style={styles.customerRowBanner}>
+                  <Image
+                    source={{ uri: (getImageUrl(newJobRequest.customerPicture) || 'https://via.placeholder.com/20') as string }}
+                    style={styles.customerAvatarBanner}
+                  />
+                  <Text style={styles.customerNameBanner}>{newJobRequest.customerName}</Text>
+                  <View style={styles.verifiedTagSmall}><ShieldCheck size={8} color="#A7F3D0" /><Text style={styles.verifiedTextSmall}>VERIFIED</Text></View>
+                </View>
+              )}
+              <Text style={styles.bannerSub} numberOfLines={1}>{newJobRequest.address}</Text>
+              <Text style={[styles.bannerSub, { color: '#A7F3D0', marginTop: 2 }]}>Claim for ₹{newJobRequest.price - Math.round(newJobRequest.price * 0.1)}</Text>
             </View>
-           <TouchableOpacity style={styles.bannerClose} onPress={() => { stopAlert(); setNewJobRequest(null); }}><Text style={{ color: '#FFF', fontWeight: '900' }}>✕</Text></TouchableOpacity>
+          </View>
+          <TouchableOpacity style={styles.bannerClose} onPress={() => { stopAlert(); setNewJobRequest(null); }}><Text style={{ color: '#FFF', fontWeight: '900' }}>✕</Text></TouchableOpacity>
         </TouchableOpacity>
       )}
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#4F46E5']} />}>
         <View style={styles.summaryRow}>
-           <TouchableOpacity style={styles.summaryCard} onPress={() => navigation.navigate('Profile')}>
-              <View style={[styles.summaryIcon, { backgroundColor: '#F0FDF4' }]}><Wallet size={20} color="#16A34A" /></View>
-              <View><Text style={styles.summaryLabel}>Total Earnings</Text><Text style={styles.summaryValue}>₹{workerData?.totalEarnings || 0}</Text></View>
-           </TouchableOpacity>
-           <TouchableOpacity style={styles.summaryCard} onPress={() => navigation.navigate('Profile')}>
-              <View style={[styles.summaryIcon, { backgroundColor: '#EEF2FF' }]}><Star size={20} color="#4F46E5" fill="#4F46E5" /></View>
-              <View><Text style={styles.summaryLabel}>Active Jobs</Text><Text style={styles.summaryValue}>{activeJobs.length}</Text></View>
-           </TouchableOpacity>
+          <TouchableOpacity style={styles.summaryCard} onPress={() => navigation.navigate('Profile')}>
+            <View style={[styles.summaryIcon, { backgroundColor: '#F0FDF4' }]}><Wallet size={20} color="#16A34A" /></View>
+            <View><Text style={styles.summaryLabel}>Total Earnings</Text><Text style={styles.summaryValue}>₹{workerData?.totalEarnings || 0}</Text></View>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.summaryCard} onPress={() => navigation.navigate('Profile')}>
+            <View style={[styles.summaryIcon, { backgroundColor: '#EEF2FF' }]}><Star size={20} color="#4F46E5" fill="#4F46E5" /></View>
+            <View><Text style={styles.summaryLabel}>Active Jobs</Text><Text style={styles.summaryValue}>{activeJobs.length}</Text></View>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.sectionHeader}><Text style={styles.sectionTitle}>Active Jobs</Text></View>
@@ -427,25 +427,28 @@ export default function HomeScreen(props: any) {
             <View key={job._id} style={[styles.jobCard, job.subscriptionId && styles.premiumCard]}>
               <View style={styles.jobHeader}>
                 <View style={styles.serviceBox}>
-                   <View style={styles.jobIconBack}>{getIcon(job.serviceId?.icon || '', 24)}</View>
-                   <View><Text style={styles.jobService}>{job.serviceId?.name}</Text></View>
+                  <View style={styles.jobIconBack}>{getIcon(job.serviceId?.icon || '', 24)}</View>
+                  <View>
+                    <Text style={styles.jobIdSmall}>#{job._id.slice(-6).toUpperCase()}</Text>
+                    <Text style={styles.jobService}>{job.serviceId?.name}</Text>
+                  </View>
                 </View>
                 <View style={[styles.statusBadge, { backgroundColor: job.status === 'in_progress' ? '#ECFDF5' : '#EEF2FF' }]}>
-                   <Text style={[styles.statusText, { color: job.status === 'in_progress' ? '#10B981' : '#4F46E5' }]}>{job.status.toUpperCase()}</Text>
+                  <Text style={[styles.statusText, { color: job.status === 'in_progress' ? '#10B981' : '#4F46E5' }]}>{job.status.toUpperCase()}</Text>
                 </View>
               </View>
 
               {job.userId && (
                 <View style={styles.customerCard}>
-                  <Image 
-                    source={{ uri: (getImageUrl(job.userId.profilePicture) || 'https://via.placeholder.com/40') as string }} 
-                    style={styles.customerAvatar} 
+                  <Image
+                    source={{ uri: (getImageUrl(job.userId.profilePicture) || 'https://via.placeholder.com/40') as string }}
+                    style={styles.customerAvatar}
                   />
                   <View style={styles.customerInfo}>
                     <Text style={styles.customerName}>{job.userId.name}</Text>
                     <View style={styles.contactRow}>
-                       <Text style={styles.customerPhone}>{job.userId.phoneNumber || 'No phone'}</Text>
-                       <View style={styles.verifiedTag}><ShieldCheck size={10} color="#10B981" /><Text style={styles.verifiedText}>VERIFIED CUSTOMER</Text></View>
+                      <Text style={styles.customerPhone}>{job.userId.phoneNumber || 'No phone'}</Text>
+                      <View style={styles.verifiedTag}><ShieldCheck size={10} color="#10B981" /><Text style={styles.verifiedText}>VERIFIED CUSTOMER</Text></View>
                     </View>
                   </View>
                 </View>
@@ -455,37 +458,37 @@ export default function HomeScreen(props: any) {
 
               {/* Pricing Breakdown */}
               <View style={styles.earningsBreakdown}>
-                 <View style={styles.earningRow}>
-                    <Text style={styles.earningLabel}>Customer Paid</Text>
-                    <Text style={styles.earningValue}>₹{job.totalAmount || job.price + (job.platformFee || 29)}</Text>
-                 </View>
-                 <View style={styles.earningRow}>
-                    <Text style={styles.earningSubLabel}>- Platform Fee (Customer)</Text>
-                    <Text style={styles.earningSubValue}>₹{job.platformFee || 29}</Text>
-                 </View>
-                 <View style={[styles.earningRow, { marginTop: 4, paddingTop: 4, borderTopWidth: 1, borderTopColor: '#F3F4F6' }]}>
-                    <Text style={styles.earningLabel}>Service Value</Text>
-                    <Text style={styles.earningValue}>₹{job.price}</Text>
-                 </View>
-                 <View style={[styles.earningRow, { marginTop: 8, padding: 8, backgroundColor: '#F0FDF4', borderRadius: 8 }]}>
-                    <Text style={[styles.earningLabel, { color: '#065F46' }]}>YOUR NET EARNINGS</Text>
-                    <Text style={[styles.earningValue, { color: '#059669', fontSize: 18 }]}>₹{job.workerEarnings || job.price}</Text>
-                 </View>
+                <View style={styles.earningRow}>
+                  <Text style={styles.earningLabel}>Customer Paid</Text>
+                  <Text style={styles.earningValue}>₹{job.totalAmount || job.price + (job.platformFee || 29)}</Text>
+                </View>
+                <View style={styles.earningRow}>
+                  <Text style={styles.earningSubLabel}>- Platform Fee (Customer)</Text>
+                  <Text style={styles.earningSubValue}>₹{job.platformFee || 29}</Text>
+                </View>
+                <View style={[styles.earningRow, { marginTop: 4, paddingTop: 4, borderTopWidth: 1, borderTopColor: '#F3F4F6' }]}>
+                  <Text style={styles.earningLabel}>Service Value</Text>
+                  <Text style={styles.earningValue}>₹{job.price}</Text>
+                </View>
+                <View style={[styles.earningRow, { marginTop: 8, padding: 8, backgroundColor: '#F0FDF4', borderRadius: 8 }]}>
+                  <Text style={[styles.earningLabel, { color: '#065F46' }]}>YOUR NET EARNINGS</Text>
+                  <Text style={[styles.earningValue, { color: '#059669', fontSize: 18 }]}>₹{job.workerEarnings || job.price}</Text>
+                </View>
               </View>
 
               {/* Active Job Tracking */}
               <View style={styles.trackingContainer}>
-                 <View style={styles.timelineItem}>
-                    <View style={[styles.timelineDot, { backgroundColor: '#10B981' }]} />
-                    {job.status !== 'confirmed' && <View style={styles.timelineLine} />}
-                    <Text style={styles.timelineText}>Accepted: {job.acceptedAt ? new Date(job.acceptedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Pending'}</Text>
-                 </View>
-                 {job.status === 'in_progress' && (
-                   <View style={styles.timelineItem}>
-                      <View style={[styles.timelineDot, { backgroundColor: '#4F46E5' }]} />
-                      <Text style={styles.timelineText}>Started Work: {job.startedAt ? new Date(job.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now'}</Text>
-                   </View>
-                 )}
+                <View style={styles.timelineItem}>
+                  <View style={[styles.timelineDot, { backgroundColor: '#10B981' }]} />
+                  {job.status !== 'confirmed' && <View style={styles.timelineLine} />}
+                  <Text style={styles.timelineText}>Accepted: {job.acceptedAt ? new Date(job.acceptedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }) : 'Pending'}</Text>
+                </View>
+                {job.status === 'in_progress' && (
+                  <View style={styles.timelineItem}>
+                    <View style={[styles.timelineDot, { backgroundColor: '#4F46E5' }]} />
+                    <Text style={styles.timelineText}>Started Work: {job.startedAt ? new Date(job.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }) : 'Just now'}</Text>
+                  </View>
+                )}
               </View>
 
               {/* Service Photos Evidence (Always visible if images exist) */}
@@ -529,27 +532,27 @@ export default function HomeScreen(props: any) {
               {/* Photo Capture Section */}
               <View style={styles.photoContainer}>
                 {job.status === 'confirmed' && (
-                  <TouchableOpacity 
-                    style={[styles.photoBtn, (serviceImages[job._id]?.before?.length || 0) > 0 && styles.activePhotoBtn]} 
+                  <TouchableOpacity
+                    style={[styles.photoBtn, (serviceImages[job._id]?.before?.length || 0) > 0 && styles.activePhotoBtn]}
                     onPress={() => takeServicePhoto(job._id, 'before')}
                   >
                     <Camera size={18} color={(serviceImages[job._id]?.before?.length || 0) > 0 ? '#10B981' : '#4F46E5'} />
                     <Text style={[styles.photoBtnText, (serviceImages[job._id]?.before?.length || 0) > 0 && styles.activePhotoBtnText]}>
-                      {(serviceImages[job._id]?.before?.length || 0) > 0 
-                        ? `Before Photo Captured (${serviceImages[job._id].before.length})` 
+                      {(serviceImages[job._id]?.before?.length || 0) > 0
+                        ? `Before Photo Captured (${serviceImages[job._id].before.length})`
                         : 'Take "Before" Photo'}
                     </Text>
                   </TouchableOpacity>
                 )}
                 {job.status === 'in_progress' && (
-                  <TouchableOpacity 
-                    style={[styles.photoBtn, (serviceImages[job._id]?.after?.length || 0) > 0 && styles.activePhotoBtn]} 
+                  <TouchableOpacity
+                    style={[styles.photoBtn, (serviceImages[job._id]?.after?.length || 0) > 0 && styles.activePhotoBtn]}
                     onPress={() => takeServicePhoto(job._id, 'after')}
                   >
                     <Camera size={18} color={(serviceImages[job._id]?.after?.length || 0) > 0 ? '#10B981' : '#10B981'} />
                     <Text style={[styles.photoBtnText, (serviceImages[job._id]?.after?.length || 0) > 0 && styles.activePhotoBtnText]}>
-                      {(serviceImages[job._id]?.after?.length || 0) > 0 
-                        ? `After Photo Captured (${serviceImages[job._id].after.length})` 
+                      {(serviceImages[job._id]?.after?.length || 0) > 0
+                        ? `After Photo Captured (${serviceImages[job._id].after.length})`
                         : 'Take "After" Photo'}
                     </Text>
                   </TouchableOpacity>
@@ -558,27 +561,62 @@ export default function HomeScreen(props: any) {
 
               <View style={styles.actionRow}>
                 {job.status === 'confirmed' && (
-                  <TouchableOpacity style={styles.startBtn} onPress={() => updateJobStatus(job._id, 'in_progress')}><Text style={styles.btnText}>Start Job</Text></TouchableOpacity>
+                  <View style={{ flexDirection: 'row', gap: 10 }}>
+                    <TouchableOpacity style={[styles.startBtn, { flex: 2 }]} onPress={() => updateJobStatus(job._id, 'in_progress')}><Text style={styles.btnText}>Start Job</Text></TouchableOpacity>
+                    <TouchableOpacity style={styles.smallCancelBtn} onPress={() => { setSelectedJobId(job._id); setCancelModalVisible(true); }}>
+                      <Text style={styles.smallCancelText}>Cancel</Text>
+                    </TouchableOpacity>
+                  </View>
                 )}
                 {job.status === 'in_progress' && (
                   <TouchableOpacity style={styles.completeBtn} onPress={() => { setSelectedJobId(job._id); setCompleteModalVisible(true); }}><Text style={styles.btnText}>Finish & Verify</Text></TouchableOpacity>
                 )}
+                <TouchableOpacity style={styles.detailLink} onPress={() => navigation.navigate('JobDetail', { bookingId: job._id })}>
+                  <Text style={styles.detailLinkText}>View All Details</Text>
+                  <ChevronRightIcon size={14} color="#4F46E5" />
+                </TouchableOpacity>
               </View>
             </View>
           ))
         )}
       </ScrollView>
 
-      <Modal animationType="slide" transparent={true} visible={completeModalVisible} onRequestClose={() => setCompleteModalVisible(false)}>
-        <View style={styles.modalOverlay}><View style={styles.modalContent}>
-          <Text style={styles.modalTitle}>Enter Completion PIN</Text>
-          <Text style={styles.modalSub}>Ask customer for their 4-digit PIN.</Text>
-          <TextInput style={styles.pinInput} placeholder="0000" keyboardType="number-pad" maxLength={4} value={completionPin} onChangeText={setCompletionPin} />
-          <View style={styles.modalActions}>
-             <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setCompleteModalVisible(false)}><Text style={styles.modalCancelText}>Cancel</Text></TouchableOpacity>
-             <TouchableOpacity style={[styles.modalConfirmBtn, { backgroundColor: '#10B981' }]} onPress={handleCompleteJob}><Text style={styles.modalConfirmText}>Verify</Text></TouchableOpacity>
+      {/* Cancel Modal */}
+      <Modal animationType="slide" transparent={true} visible={cancelModalVisible} onRequestClose={() => setCancelModalVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Cancel This Job?</Text>
+            <Text style={styles.modalSub}>Repeat cancellations may affect your rating.</Text>
+            <TextInput
+              style={styles.pinInput}
+              placeholder="Reason (e.g. Bike issue)"
+              value={cancelReason}
+              onChangeText={setCancelReason}
+              multiline
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setCancelModalVisible(false)}><Text style={styles.modalCancelText}>Back</Text></TouchableOpacity>
+              <TouchableOpacity style={[styles.modalConfirmBtn, { backgroundColor: '#EF4444' }]} onPress={handleCancelJob} disabled={cancelling}>
+                {cancelling ? <ActivityIndicator color="#FFF" /> : <Text style={styles.modalConfirmText}>Cancel Job</Text>}
+              </TouchableOpacity>
+            </View>
           </View>
-        </View></View>
+        </View>
+      </Modal>
+
+      {/* Complete Modal */}
+      <Modal animationType="slide" transparent={true} visible={completeModalVisible} onRequestClose={() => setCompleteModalVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Enter Completion PIN</Text>
+            <Text style={styles.modalSub}>Ask customer for their 4-digit PIN.</Text>
+            <TextInput style={styles.pinInput} placeholder="0000" keyboardType="number-pad" maxLength={4} value={completionPin} onChangeText={setCompletionPin} />
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setCompleteModalVisible(false)}><Text style={styles.modalCancelText}>Cancel</Text></TouchableOpacity>
+              <TouchableOpacity style={[styles.modalConfirmBtn, { backgroundColor: '#10B981' }]} onPress={handleCompleteJob}><Text style={styles.modalConfirmText}>Verify</Text></TouchableOpacity>
+            </View>
+          </View>
+        </View>
       </Modal>
 
       <PremiumToast visible={toastVisible} message={toastMessage} type={toastType} onHide={() => setToastVisible(false)} />
@@ -667,7 +705,7 @@ const styles = StyleSheet.create({
   activePhotoBtn: { backgroundColor: '#ECFDF5', borderColor: '#10B981', borderStyle: 'solid' },
   photoBtnText: { marginLeft: 8, fontSize: 13, fontWeight: '700', color: '#4B5563' },
   activePhotoBtnText: { color: '#065F46' },
-  
+
   // New Transparency Styles
   earningsBreakdown: { marginBottom: 20, padding: 12, backgroundColor: '#FAFAFA', borderRadius: 16, borderWidth: 1, borderColor: '#F1F5F9' },
   earningRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
@@ -675,7 +713,7 @@ const styles = StyleSheet.create({
   earningValue: { fontSize: 14, fontWeight: '900', color: '#1E1B4B' },
   earningSubLabel: { fontSize: 11, color: '#64748B', fontWeight: '700' },
   earningSubValue: { fontSize: 11, color: '#64748B', fontWeight: '800' },
-  
+
   // Evidence Styles
   evidenceContainer: { marginBottom: 20 },
   evidenceTitle: { fontSize: 12, fontWeight: '900', color: '#1E1B4B', textTransform: 'uppercase', marginBottom: 10, letterSpacing: 0.5 },
@@ -684,7 +722,12 @@ const styles = StyleSheet.create({
   localImageWrapper: { position: 'relative' },
   unsavedBadge: { position: 'absolute', top: 4, right: 4, backgroundColor: '#4F46E5', paddingHorizontal: 4, paddingVertical: 2, borderRadius: 4 },
   unsavedText: { color: '#FFF', fontSize: 7, fontWeight: '900' },
-  
+
   contactRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
-  customerPhone: { fontSize: 12, fontWeight: '700', color: '#4B5563', marginRight: 10 }
+  customerPhone: { fontSize: 12, fontWeight: '700', color: '#4B5563', marginRight: 10 },
+  jobIdSmall: { fontSize: 10, fontWeight: '800', color: '#94A3B8', marginBottom: 2 },
+  smallCancelBtn: { flex: 1, backgroundColor: '#FEE2E2', borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
+  smallCancelText: { color: '#EF4444', fontSize: 13, fontWeight: '900' },
+  detailLink: { marginTop: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#F3F4F6' },
+  detailLinkText: { color: '#4F46E5', fontSize: 13, fontWeight: '800' }
 });

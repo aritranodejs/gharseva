@@ -25,7 +25,8 @@ class BookingRepository {
       assignedWorkerId: workerId,
       status: { $in: statuses }
     }).populate('serviceId', 'name icon categoryId')
-      .populate('userId', 'name profilePicture phoneNumber');
+      .populate('userId', 'name profilePicture phoneNumber')
+      .sort({ createdAt: -1 });
   }
 
   async updateStatus(id, status, workerId, additionalUpdates = {}) {
@@ -45,8 +46,17 @@ class BookingRepository {
     return await Booking.findByIdAndUpdate(id, update, { new: true });
   }
 
-  async findByIdAndQuery(id, query) {
-    return await Booking.findOne({ _id: id, ...query });
+  async countWorkerCompletedJobsToday(workerId) {
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date();
+    endOfDay.setHours(23, 59, 59, 999);
+
+    return await Booking.countDocuments({
+      assignedWorkerId: workerId,
+      status: 'completed',
+      completedAt: { $gte: startOfDay, $lte: endOfDay }
+    });
   }
 }
 

@@ -48,6 +48,11 @@ export default function ProfileScreen(props: any) {
   const [allCategories, setAllCategories] = useState<any[]>([]);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
+  
+  const [serviceableAreas, setServiceableAreas] = useState<any[]>([]);
+  const [selectedPincodes, setSelectedPincodes] = useState<string[]>([]);
+  const [showPincodeModal, setShowPincodeModal] = useState(false);
+
   const [docModalVisible, setDocModalVisible] = useState(false);
   const [docUrl, setDocUrl] = useState<string | null>(null);
 
@@ -65,6 +70,7 @@ export default function ProfileScreen(props: any) {
   useEffect(() => {
     fetchProfile();
     fetchCategories();
+    fetchAreas();
   }, []);
 
   const getRequirements = () => {
@@ -93,6 +99,7 @@ export default function ProfileScreen(props: any) {
        setAadhaarNumber(data.data.aadhaarNumber || '');
        setPanNumber(data.data.panNumber || '');
        setSelectedCategories(data.data.categories?.map((c: any) => c._id || c) || []);
+       setSelectedPincodes(data.data.pincodes || []);
     } catch (err) {
        console.log('Error fetching profile', err);
     } finally {
@@ -106,6 +113,20 @@ export default function ProfileScreen(props: any) {
       setAllCategories(data.data);
     } catch (err) {
       console.log('Error fetching categories', err);
+    }
+  };
+
+  const fetchAreas = async () => {
+    try {
+      const res = await api.get('/areas');
+      const areasData = res.data?.data || [];
+      const allPins = areasData.reduce((acc: string[], city: any) => {
+        return [...acc, ...(city.pincodes || [])];
+      }, []);
+      const uniquePins = [...new Set(allPins)].sort().map(p => ({ pincode: p }));
+      setServiceableAreas(uniquePins);
+    } catch (err) {
+      console.log('Error fetching areas', err);
     }
   };
 
@@ -193,6 +214,7 @@ export default function ProfileScreen(props: any) {
       formData.append('aadhaarNumber', aadhaarNumber);
       formData.append('panNumber', panNumber);
       formData.append('categories', JSON.stringify(selectedCategories));
+      formData.append('pincodes', JSON.stringify(selectedPincodes));
       
       const appendFile = (field: string, file: any, defaultName: string) => {
         if (file) {
@@ -356,6 +378,34 @@ export default function ProfileScreen(props: any) {
           {profile?.status !== 'approved' && (
             <Text style={styles.infoNote}>Changing skills may require new document verification.</Text>
           )}
+        </View>
+
+        {/* Section: Serviceable Areas */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionTitleRow}>
+               <MapPin size={20} color="#4F46E5" />
+               <Text style={styles.sectionTitle}>Serviceable Areas</Text>
+            </View>
+            <TouchableOpacity onPress={() => setShowPincodeModal(true)}>
+               <Text style={styles.editLink}>Update Areas</Text>
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.categoriesShelf}>
+             {selectedPincodes && selectedPincodes.length > 0 ? (
+               selectedPincodes.map((pin: string) => (
+                 <View key={pin} style={[styles.skillTag, { backgroundColor: '#F0F9FF', borderColor: '#BAE6FD' }]}>
+                    <Text style={[styles.skillTagText, { color: '#0369A1' }]}>{pin}</Text>
+                 </View>
+               ))
+             ) : (
+               <View style={[styles.emptyPrompt, { borderColor: '#BAE6FD', backgroundColor: '#F0F9FF' }]}>
+                 <MapPin size={20} color="#0369A1" style={{ marginBottom: 4 }} />
+                 <Text style={[styles.emptyText, { color: '#0369A1' }]}>No areas selected yet</Text>
+               </View>
+             )}
+          </View>
         </View>
 
         {/* Section: Identity Verification */}
@@ -593,6 +643,55 @@ export default function ProfileScreen(props: any) {
 
                <TouchableOpacity style={styles.modalApplyBtn} onPress={() => setShowCategoryModal(false)}>
                   <Text style={styles.modalApplyText}>Update My Skills</Text>
+               </TouchableOpacity>
+            </View>
+         </View>
+      </Modal>
+
+      {/* Areas Selection Modal */}
+      <Modal visible={showPincodeModal} animationType="slide" transparent={true}>
+         <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+               <View style={styles.modalHandle} />
+               <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Update Service Areas</Text>
+                  <TouchableOpacity onPress={() => setShowPincodeModal(false)}>
+                     <X size={24} color="#111827" />
+                  </TouchableOpacity>
+               </View>
+               <Text style={styles.modalSub}>Select the pincodes where you can provide services. This helps us direct local jobs to you.</Text>
+               
+               <ScrollView style={styles.categoryGrid}>
+                  <View style={styles.categoryGridInner}>
+                     {serviceableAreas.map(area => {
+                        const isSelected = selectedPincodes.includes(area.pincode);
+                        return (
+                          <TouchableOpacity 
+                            key={area.pincode} 
+                            style={[styles.categoryCard, isSelected && styles.categoryCardSelected]}
+                            onPress={() => {
+                               setSelectedPincodes(prev => 
+                                 prev.includes(area.pincode) 
+                                   ? prev.filter(p => p !== area.pincode) 
+                                   : [...prev, area.pincode]
+                               );
+                            }}
+                          >
+                             <Text style={styles.categoryIcon}><MapPin size={24} color={isSelected ? "#4F46E5" : "#64748B"} /></Text>
+                             <Text style={[styles.categoryName, isSelected && styles.categoryNameSelected]}>{area.pincode}</Text>
+                             {isSelected && (
+                                <View style={styles.selectedCheck}>
+                                   <Check size={12} color="#FFF" />
+                                </View>
+                             )}
+                          </TouchableOpacity>
+                        );
+                     })}
+                  </View>
+               </ScrollView>
+
+               <TouchableOpacity style={styles.modalApplyBtn} onPress={() => setShowPincodeModal(false)}>
+                  <Text style={styles.modalApplyText}>Confirm Service Areas</Text>
                </TouchableOpacity>
             </View>
          </View>

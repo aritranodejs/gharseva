@@ -39,6 +39,26 @@ class ServiceController {
       sendError(res, err.message, 500);
     }
   }
+
+  async updateService(req, res) {
+    try {
+      const service = await serviceService.updateService(req.params.id, req.body);
+      if (!service) return sendError(res, 'Service not found', 404);
+      sendSuccess(res, service, 'Service updated successfully');
+    } catch (err) {
+      sendError(res, err.message, 500);
+    }
+  }
+
+  async deleteService(req, res) {
+    try {
+      const service = await serviceService.deleteService(req.params.id);
+      if (!service) return sendError(res, 'Service not found', 404);
+      sendSuccess(res, null, 'Service deleted successfully');
+    } catch (err) {
+      sendError(res, err.message, 500);
+    }
+  }
 }
 
 module.exports = new ServiceController();

@@ -29,6 +29,18 @@ const seedPremium = async () => {
     });
 
     console.log("Premium Package Seeded:", pkg.name);
+
+    // Update individual services with premium/luxury flags
+    await Service.updateMany(
+      { name: { $regex: /Cleaning/i } },
+      { $set: { isPremium: true } }
+    );
+
+    await Service.updateMany(
+      { name: { $regex: /Full Home/i } },
+      { $set: { isLuxury: true } }
+    );
+    console.log("Service premium/luxury flags updated.");
   } catch (error) {
     console.error('Error seeding premium package:', error);
     throw error;

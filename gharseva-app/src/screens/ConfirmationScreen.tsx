@@ -31,22 +31,41 @@ export default function ConfirmationScreen({ route, navigation }: Props) {
   const [selectedAddress, setSelectedAddress] = useState<any>(null);
   const [savedMethods, setSavedMethods] = useState<any[]>([]);
 
+  const [config, setConfig] = useState<any>(null);
+
   useEffect(() => {
-    const fetchMethods = async () => {
+    const fetchData = async () => {
       try {
-        const { data } = await api.get('payments/methods');
-        if (data.success && data.data) {
-          const upiMethods = data.data.filter((m: any) => m.type === 'upi');
+        const [methodsRes, configRes] = await Promise.all([
+          api.get('payments/methods'),
+          api.get('public/settings')
+        ]);
+
+        if (methodsRes.data.success && methodsRes.data.data) {
+          const upiMethods = methodsRes.data.data.filter((m: any) => m.type === 'upi');
           setSavedMethods(upiMethods);
           if (upiMethods.length > 0) {
             setUpiId(upiMethods[0].identifier);
             setIsVerified(true);
           }
         }
+
+        if (configRes.data.success) {
+          setConfig(configRes.data.data);
+        }
       } catch (err) {}
     };
-    fetchMethods();
+    fetchData();
   }, []);
+
+  const calculateFee = () => {
+    if (!config) return Math.max(29, Math.round(basePrice * 0.1));
+    if (config.platformFeeType === 'fixed') return config.platformFeeValue;
+    return Math.max(29, Math.round(basePrice * (config.platformFeeValue / 100)));
+  };
+
+  const platformFeeValue = calculateFee();
+  const totalDisplay = basePrice + platformFeeValue;
   
   const [selectedPayment, setSelectedPayment] = useState('upi');
   const [upiId, setUpiId] = useState('');
@@ -244,6 +263,20 @@ export default function ConfirmationScreen({ route, navigation }: Props) {
                </View>
                <Text style={styles.servicePriceMain}>₹{basePrice}</Text>
             </View>
+            
+            {/* New Fee Breakdown for Transparency */}
+            <View style={{ marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: '#E5E7EB' }}>
+               <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <Text style={{ color: '#6B7280', fontSize: 13, fontWeight: '500' }}>Service Charge</Text>
+                  <Text style={{ color: '#111827', fontSize: 13, fontWeight: '700' }}>₹{basePrice}</Text>
+               </View>
+               <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={{ color: '#6B7280', fontSize: 13, fontWeight: '500' }}>
+                    Platform Fee ({config?.platformFeeType === 'fixed' ? 'Fixed' : `${config?.platformFeeValue || 10}%`})
+                  </Text>
+                  <Text style={{ color: '#111827', fontSize: 13, fontWeight: '700' }}>₹{platformFeeValue}</Text>
+               </View>
+            </View>
           </View>
 
           {/* Elegant Address Section */}
@@ -368,8 +401,8 @@ export default function ConfirmationScreen({ route, navigation }: Props) {
         <View style={styles.bottomCheckout}>
            <View style={styles.totalGroup}>
               <Text style={styles.totalLabel}>Grand Total</Text>
-              <Text style={styles.totalAmount}>₹{basePrice + Math.max(29, Math.round(basePrice * 0.1))}</Text>
-              <Text style={styles.feeNote}>Incl. ₹{Math.max(29, Math.round(basePrice * 0.1))} platform fee</Text>
+              <Text style={styles.totalAmount}>₹{totalDisplay}</Text>
+              <Text style={styles.feeNote}>Incl. ₹{platformFeeValue} platform fee</Text>
            </View>
            <TouchableOpacity 
               style={[styles.checkoutBtn, loading && styles.btnDisabled]}

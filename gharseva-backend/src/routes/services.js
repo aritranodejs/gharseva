@@ -15,5 +15,7 @@ router.get('/', serviceController.getServices);
  * @access  Admin (Mocked)
  */
 router.post('/', serviceController.createService);
+router.patch('/:id', serviceController.updateService);
+router.delete('/:id', serviceController.deleteService);
 
 module.exports = router;

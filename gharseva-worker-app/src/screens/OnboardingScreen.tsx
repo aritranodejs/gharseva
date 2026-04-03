@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, ScrollView, Image, StatusBar } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
-import { ShieldCheck as ShieldCheckIcon, ArrowLeft as ArrowLeftIcon, Image as ImageIconLucide, Briefcase as BriefcaseIcon, Lock as LockIcon, Phone as PhoneIcon, User as UserIcon, CheckCircle2 as CheckCircle2Icon, Camera, FileText } from 'lucide-react-native';
+import { ShieldCheck as ShieldCheckIcon, ArrowLeft as ArrowLeftIcon, Image as ImageIconLucide, Briefcase as BriefcaseIcon, Lock as LockIcon, Phone as PhoneIcon, User as UserIcon, CheckCircle2 as CheckCircle2Icon, Camera, FileText, TrendingUp as TrendingUpIcon } from 'lucide-react-native';
 
 const ShieldCheck = ShieldCheckIcon as any;
 const ArrowLeft = ArrowLeftIcon as any;
@@ -12,6 +12,7 @@ const Lock = LockIcon as any;
 const Phone = PhoneIcon as any;
 const User = UserIcon as any;
 const CheckCircle2 = CheckCircle2Icon as any;
+const TrendingUp = TrendingUpIcon as any;
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import api from '../services/api';
 import PremiumToast from '../components/PremiumToast';
@@ -41,12 +42,14 @@ export default function OnboardingScreen({ navigation }: any) {
   const [step, setStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [categories, setCategories] = useState<any[]>([]);
+  const [serviceableAreas, setServiceableAreas] = useState<any[]>([]);
 
   const [form, setForm] = useState({
     name: '',
     phoneNumber: '',
     password: '',
     selectedCategories: [] as string[],
+    pincodes: [] as string[],
     profilePicture: null as any,
     aadhaarNumber: '',
     aadhaarImage: null as any,
@@ -68,15 +71,19 @@ export default function OnboardingScreen({ navigation }: any) {
   };
 
   useEffect(() => {
-    const fetchCats = async () => {
+    const fetchSupportData = async () => {
       try {
-        const { data } = await api.get('categories');
-        setCategories(data.data || []);
+        const [catRes, areaRes] = await Promise.all([
+          api.get('categories'),
+          api.get('areas')
+        ]);
+        setCategories(catRes.data.data || []);
+        setServiceableAreas(areaRes.data.data || []);
       } catch (err) {
-        console.log('Categories error', err);
+        console.log('Support data error', err);
       }
     };
-    fetchCats();
+    fetchSupportData();
   }, []);
 
 
@@ -168,6 +175,7 @@ export default function OnboardingScreen({ navigation }: any) {
       formData.append('phoneNumber', form.phoneNumber);
       formData.append('password', form.password);
       formData.append('categories', JSON.stringify(form.selectedCategories));
+      formData.append('pincodes', JSON.stringify(form.pincodes));
       formData.append('aadhaarNumber', form.aadhaarNumber);
       if (form.panNumber) formData.append('panNumber', form.panNumber);
 
@@ -294,7 +302,6 @@ export default function OnboardingScreen({ navigation }: any) {
                   style={[styles.categoryPill, isSelected && styles.categoryPillActive]}
                   onPress={() => toggleCategory(c._id)}
                 >
-                  {isSelected && <CheckCircle2 size={16} color="#4F46E5" style={{ marginRight: 6 }} />}
                   <Text style={[styles.categoryText, isSelected && styles.categoryTextActive]}>{c.name}</Text>
                 </TouchableOpacity>
               );
@@ -302,13 +309,47 @@ export default function OnboardingScreen({ navigation }: any) {
           </View>
 
           <TouchableOpacity style={styles.mainButton} onPress={() => setStep(3)} disabled={form.selectedCategories.length === 0}>
-            <Text style={styles.buttonText}>Continue to Uploads</Text>
+            <Text style={styles.buttonText}>Continue to Areas</Text>
           </TouchableOpacity>
         </View>
       );
     }
 
     if (step === 3) {
+      return (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Where do you work?</Text>
+          <Text style={styles.cardSub}>Select your serviceable pincodes.</Text>
+
+          <View style={styles.categoryGrid}>
+            {serviceableAreas.map((a) => {
+              const isSelected = form.pincodes.includes(a.pincode);
+              return (
+                <TouchableOpacity
+                  key={a._id}
+                  style={[styles.categoryPill, isSelected && styles.categoryPillActive]}
+                  onPress={() => {
+                    const newPins = isSelected 
+                      ? form.pincodes.filter(p => p !== a.pincode)
+                      : [...form.pincodes, a.pincode];
+                    setForm({ ...form, pincodes: newPins });
+                  }}
+                >
+                   {isSelected && <CheckCircle2 size={16} color="#4F46E5" style={{ marginRight: 6 }} />}
+                  <Text style={[styles.categoryText, isSelected && styles.categoryTextActive]}>{a.pincode}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          <TouchableOpacity style={styles.mainButton} onPress={() => setStep(4)} disabled={form.pincodes.length === 0}>
+            <Text style={styles.buttonText}>Continue to Uploads</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    if (step === 4) {
       const { needsPolice, needsCert } = getRequirements();
       return (
         <View style={styles.card}>
@@ -413,6 +454,16 @@ export default function OnboardingScreen({ navigation }: any) {
             </View>
           )}
 
+          <View style={styles.commissionNotice}>
+              <TrendingUp size={20} color="#059669" />
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                 <Text style={styles.commissionTitle}>Earnings & Commission</Text>
+                 <Text style={styles.commissionText}>
+                    GharSeva charges a flat 10% platform commission on your total earnings. No hidden charges.
+                 </Text>
+              </View>
+          </View>
+
           <TouchableOpacity 
             style={[styles.mainButton, (!form.profilePicture || !form.aadhaarImage || form.aadhaarNumber.length < 12) && styles.buttonDisabled]} 
             onPress={handleSubmit} 
@@ -439,9 +490,9 @@ export default function OnboardingScreen({ navigation }: any) {
           <Text style={styles.brandSub}>Apply as a verified professional</Text>
 
           <View style={styles.progressContainer}>
-            <Text style={styles.progressLabel}>Step {step} of 3</Text>
+            <Text style={styles.progressLabel}>Step {step} of 4</Text>
             <View style={styles.progressBar}>
-              <View style={[styles.progressFill, { width: `${(step / 3) * 100}%` }]} />
+              <View style={[styles.progressFill, { width: `${(step / 4) * 100}%` }]} />
             </View>
           </View>
         </View>
@@ -507,5 +558,9 @@ const styles = StyleSheet.create({
   uploadBoxText: { fontSize: 14, color: '#6B7280', fontWeight: '600', marginTop: 12 },
   uploadPreview: { width: '100%', height: '100%' },
   warningBox: { backgroundColor: '#FFFBEB', padding: 12, borderRadius: 12, flexDirection: 'row', alignItems: 'flex-start', marginBottom: 12 },
-  warningText: { fontSize: 12, color: '#D97706', fontWeight: '600', flex: 1, marginLeft: 8, lineHeight: 18 }
+  warningText: { fontSize: 12, color: '#D97706', fontWeight: '600', flex: 1, marginLeft: 8, lineHeight: 18 },
+  
+  commissionNotice: { flexDirection: 'row', backgroundColor: '#ECFDF5', padding: 16, borderRadius: 20, borderLeftWidth: 4, borderLeftColor: '#10B981', marginTop: 8, marginBottom: 20 },
+  commissionTitle: { fontSize: 15, fontWeight: '900', color: '#065F46' },
+  commissionText: { fontSize: 12, color: '#047857', fontWeight: '600', marginTop: 2, lineHeight: 18 }
 });

@@ -88,11 +88,19 @@ class BookingService {
         throw new Error('Invalid Completion OTP. Ask the customer for their 4-digit PIN.');
       }
 
-      const platformFee = booking.platformFee || Math.round(booking.price * 0.1);
-      const workerEarnings = booking.price;
+      const Settings = require('../models/Settings');
+      const settings = (await Settings.findOne()) || { platformFeeType: 'fixed', platformFeeValue: 29, workerCommissionPercentage: 10, minJobsForCommission: 10 };
       
-      updates.platformFee = platformFee;
+      const dailyCount = await this.bookingRepository.countWorkerCompletedJobsToday(workerId);
+      const isThresholdMet = (dailyCount + 1) >= (settings.minJobsForCommission || 10);
+      
+      const commissionRate = isThresholdMet ? (settings.workerCommissionPercentage || 10) : 0;
+      const workerCommissionAmount = Math.round(booking.price * (commissionRate / 100));
+      const workerEarnings = booking.price - workerCommissionAmount;
+      
       updates.workerEarnings = workerEarnings;
+      // We also store the commission rate used for transparency
+      updates.commissionApplied = commissionRate;
 
       await Worker.findByIdAndUpdate(workerId, { 
         $inc: { 
@@ -128,7 +136,18 @@ class BookingService {
   }
 
   async createUserBooking(userId, bookingData) {
-    const platformFee = Math.round(bookingData.price * 0.1);
+    const Settings = require('../models/Settings');
+    const settings = (await Settings.findOne()) || { platformFeeType: 'fixed', platformFeeValue: 29 };
+
+    const feeVal = Number(settings.platformFeeValue) || 29;
+
+    let platformFee = 0;
+    if (settings.platformFeeType === 'percentage') {
+        platformFee = Math.round(bookingData.price * (feeVal / 100));
+    } else {
+        platformFee = feeVal;
+    }
+    
     const totalAmount = bookingData.price + platformFee;
     const workerEarnings = bookingData.price;
 
@@ -173,8 +192,8 @@ class BookingService {
     const booking = await this.bookingRepository.findByIdAndQuery(bookingId, query);
     if (!booking) throw new Error('Booking not found or unauthorized to cancel');
 
-    if (['completed', 'cancelled'].includes(booking.status)) {
-      throw new Error(`Cannot cancel a booking that is already ${booking.status}`);
+    if (['in_progress', 'completed', 'cancelled'].includes(booking.status)) {
+      throw new Error(`Cannot cancel a booking that is already ${booking.status.replace('_', ' ')}`);
     }
 
     booking.status = BOOKING_STATUS.CANCELLED;
@@ -219,6 +238,60 @@ class BookingService {
         cancelledBy
       });
     }
+
+    return booking;
+  }
+
+  async workerCancelBooking(bookingId, workerId, reason) {
+    const booking = await this.bookingRepository.findById(bookingId);
+    if (!booking) throw new Error('Booking not found');
+
+    const assignedId = booking.assignedWorkerId?._id || booking.assignedWorkerId;
+    if (!assignedId || String(assignedId) !== String(workerId)) {
+      throw new Error('Unauthorized or job not assigned to you.');
+    }
+
+    if (booking.status !== BOOKING_STATUS.CONFIRMED) {
+      const msg = booking.status === 'in_progress' 
+        ? 'Cannot cancel a job that has already started.' 
+        : 'Job is not in a cancellable state.';
+      throw new Error(msg);
+    }
+
+    // Reset for re-assignment
+    booking.status = BOOKING_STATUS.SEARCHING;
+    booking.assignedWorkerId = null;
+    
+    // Add to excluded list
+    if (!booking.excludedWorkerIds) booking.excludedWorkerIds = [];
+    if (!booking.excludedWorkerIds.includes(workerId)) {
+      booking.excludedWorkerIds.push(workerId);
+    }
+    
+    await booking.save();
+
+    // Decrement worker's active count
+    await Worker.findByIdAndUpdate(workerId, { $inc: { activeBookingsCount: -1 } });
+
+    // Notify user of worker cancellation
+    if (global.io) {
+      global.io.to(`user_${booking.userId}`).emit('worker_cancelled_job', {
+        bookingId: booking._id,
+        reason
+      });
+    }
+
+    // CREATE NOTIFICATION for user
+    await notificationService.createNotification({
+       userId: booking.userId,
+       title: 'Professional Cancelled',
+       message: `The professional has cancelled the job due to: ${reason}. We are searching for a replacement.`,
+       type: 'booking'
+    });
+
+    // Re-trigger assignment logic
+    const assignmentService = require('./assignmentService');
+    assignmentService.assignWorkerToBooking(booking._id).catch(console.error);
 
     return booking;
   }
