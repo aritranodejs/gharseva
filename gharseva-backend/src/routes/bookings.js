@@ -31,4 +31,11 @@ router.get('/:id', protectAny, bookingController.getById);
  */
 router.patch('/:id/cancel', protectAny, bookingController.cancel);
 
+/**
+ * @route   POST /api/bookings/:id/rebroadcast
+ * @desc    Customer triggers a re-broadcast to find workers
+ * @access  Private (User only)
+ */
+router.post('/:id/rebroadcast', protect, bookingController.rebroadcast);
+
 module.exports = router;

@@ -27,6 +27,8 @@ const bookingSchema = mongoose.Schema(
     startedAt: { type: Date },
     completedAt: { type: Date },
     cancelledAt: { type: Date },
+    beforeServiceImages: [{ type: String }],
+    afterServiceImages: [{ type: String }],
     completionOtp: { type: String, default: () => Math.floor(1000 + Math.random() * 9000).toString() }
   },
   {

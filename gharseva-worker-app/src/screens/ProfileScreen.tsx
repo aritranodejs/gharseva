@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Image, ActivityIndicator, Alert, Modal, StatusBar } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Image, ActivityIndicator, Alert, Modal, StatusBar, Linking } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
-import { Camera, ShieldCheck, MapPin, Star, Phone, ArrowLeft, Check, X, LogOut, Briefcase, FileText, ChevronRight, HelpCircle } from 'lucide-react-native';
+import * as DocumentPicker from 'expo-document-picker';
+import { Camera, ShieldCheck, MapPin, Star, Phone, ArrowLeft, Check, X, LogOut, Briefcase, FileText, ChevronRight, HelpCircle, File } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import api, { getImageUrl } from '../services/api';
 import PremiumToast from '../components/PremiumToast';
+import PremiumUploadModal from '../components/PremiumUploadModal';
 
 const EMOJI_MAP: Record<string, string> = {
   'sparkles': '🧺',
@@ -40,14 +42,19 @@ export default function ProfileScreen(props: any) {
   const [newAvatar, setNewAvatar] = useState<any>(null);
   const [newAadhaarImage, setNewAadhaarImage] = useState<any>(null);
   const [newPanImage, setNewPanImage] = useState<any>(null);
+  const [newPoliceImage, setNewPoliceImage] = useState<any>(null);
+  const [newCertImage, setNewCertImage] = useState<any>(null);
   
   const [allCategories, setAllCategories] = useState<any[]>([]);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [docModalVisible, setDocModalVisible] = useState(false);
+  const [docUrl, setDocUrl] = useState<string | null>(null);
 
   const [toastVisible, setToastVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState<'success' | 'error' | 'info'>('info');
+  const [isUploading, setIsUploading] = useState(false);
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     setToastMessage(message);
@@ -102,19 +109,71 @@ export default function ProfileScreen(props: any) {
     }
   };
 
-  const handlePickImage = async (field: 'avatar' | 'aadhaar' | 'pan' | 'police' | 'cert') => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      quality: 0.8,
-      aspect: field === 'avatar' ? [1, 1] : undefined
-    });
-
-    if (!result.canceled) {
-      if (field === 'avatar') setNewAvatar(result.assets[0]);
-      if (field === 'aadhaar') setNewAadhaarImage(result.assets[0]);
-      if (field === 'pan') setNewPanImage(result.assets[0]);
-    }
+  const handlePickDocument = async (field: 'avatar' | 'aadhaar' | 'pan' | 'police' | 'cert') => {
+    const isDocument = ['aadhaar', 'pan', 'police', 'cert'].includes(field);
+    
+    Alert.alert(
+      'Select Source',
+      'Choose how you want to upload this document',
+      [
+        {
+          text: 'Camera',
+          onPress: async () => {
+            const result = await ImagePicker.launchCameraAsync({
+              mediaTypes: ImagePicker.MediaTypeOptions.Images,
+              allowsEditing: true,
+              quality: 0.6,
+              ...(field === 'avatar' ? { aspect: [1, 1] } : {})
+            });
+            if (!result.canceled) {
+              const asset = result.assets[0];
+              if (field === 'avatar') setNewAvatar(asset);
+              else if (field === 'aadhaar') setNewAadhaarImage(asset);
+              else if (field === 'pan') setNewPanImage(asset);
+              else if (field === 'police') setNewPoliceImage(asset);
+              else if (field === 'cert') setNewCertImage(asset);
+            }
+          }
+        },
+        {
+          text: 'Gallery',
+          onPress: async () => {
+            const result = await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ImagePicker.MediaTypeOptions.Images,
+              allowsEditing: true,
+              quality: 0.6,
+              ...(field === 'avatar' ? { aspect: [1, 1] } : {})
+            });
+            if (!result.canceled) {
+              const asset = result.assets[0];
+              if (field === 'avatar') setNewAvatar(asset);
+              else if (field === 'aadhaar') setNewAadhaarImage(asset);
+              else if (field === 'pan') setNewPanImage(asset);
+              else if (field === 'police') setNewPoliceImage(asset);
+              else if (field === 'cert') setNewCertImage(asset);
+            }
+          }
+        },
+        ...(isDocument ? [{
+          text: 'Files (PDF/Images)',
+          onPress: async () => {
+            const result = await DocumentPicker.getDocumentAsync({
+              type: ['image/*', 'application/pdf'],
+              copyToCacheDirectory: true
+            });
+            if (!result.canceled) {
+              const asset = result.assets[0];
+              const fileObj = { uri: asset.uri, name: asset.name, type: asset.mimeType };
+              if (field === 'aadhaar') setNewAadhaarImage(fileObj);
+              else if (field === 'pan') setNewPanImage(fileObj);
+              else if (field === 'police') setNewPoliceImage(fileObj);
+              else if (field === 'cert') setNewCertImage(fileObj);
+            }
+          }
+        }] : []),
+        { text: 'Cancel', style: 'cancel' }
+      ]
+    );
   };
 
   const toggleCategory = (id: string) => {
@@ -126,6 +185,7 @@ export default function ProfileScreen(props: any) {
   const handleSave = async () => {
     const { needsPolice, needsCert } = getRequirements();
     
+    setIsUploading(true);
     setSaving(true);
     try {
       const formData = new FormData();
@@ -136,10 +196,23 @@ export default function ProfileScreen(props: any) {
       
       const appendFile = (field: string, file: any, defaultName: string) => {
         if (file) {
+          const isPdf = file.name?.toLowerCase().endsWith('.pdf') || 
+                        file.type === 'application/pdf' || 
+                        file.mimeType === 'application/pdf';
+          
+          let fileName = file.name || defaultName;
+          // Ensure correct extension for backend MIME detection
+          if (isPdf && !fileName.toLowerCase().endsWith('.pdf')) {
+            fileName = fileName.replace(/\.[^/.]+$/, "") + ".pdf";
+            if (!fileName.endsWith(".pdf")) fileName += ".pdf";
+          } else if (!isPdf && !fileName.toLowerCase().endsWith('.jpg') && !fileName.toLowerCase().endsWith('.jpeg')) {
+            fileName += '.jpg';
+          }
+
           formData.append(field, {
             uri: file.uri,
-            type: 'image/jpeg',
-            name: defaultName
+            type: isPdf ? 'application/pdf' : 'image/jpeg',
+            name: fileName
           } as any);
         }
       };
@@ -147,8 +220,11 @@ export default function ProfileScreen(props: any) {
       appendFile('profilePicture', newAvatar, 'profile_update.jpg');
       appendFile('aadhaarImage', newAadhaarImage, 'aadhaar_update.jpg');
       appendFile('panImage', newPanImage, 'pan_update.jpg');
+      // Added missing document updates
+      if (newPoliceImage) appendFile('policeVerification', newPoliceImage, 'police_update.jpg');
+      if (newCertImage) appendFile('certification', newCertImage, 'cert_update.jpg');
 
-      await api.put('/workers/profile', formData, {
+      const response = await api.put('/workers/profile', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       
@@ -157,11 +233,30 @@ export default function ProfileScreen(props: any) {
       setNewAvatar(null);
       setNewAadhaarImage(null);
       setNewPanImage(null);
+      setNewPoliceImage(null);
+      setNewCertImage(null);
     } catch (err: any) {
       showToast(err.response?.data?.message || 'Failed to update profile.', 'error');
     } finally {
        setSaving(false);
+       setIsUploading(false);
     }
+  };
+
+  const handleViewDoc = (uri: string | null | undefined, isUrl = false) => {
+    if (!uri) return;
+    const finalUrl = isUrl ? getImageUrl(uri) : uri;
+    const isPdf = finalUrl?.toLowerCase().endsWith('.pdf') || 
+                  finalUrl?.includes('application/pdf') ||
+                  uri?.toLowerCase().includes('pdf'); // Catch-all for our previous bug where filename had pdf but was saved as jpg
+    
+    if (isPdf && finalUrl) {
+      Linking.openURL(finalUrl).catch(() => showToast('Could not open PDF file.', 'error'));
+      return;
+    }
+
+    setDocUrl(finalUrl);
+    setDocModalVisible(true);
   };
 
   if (loading) {
@@ -195,7 +290,7 @@ export default function ProfileScreen(props: any) {
             <View style={styles.avatarContainer}>
               <View style={styles.avatarWrapper}>
                 <Image source={avatarSource} style={styles.avatar} />
-                <TouchableOpacity style={styles.editAvatarBtn} onPress={() => handlePickImage('avatar')}>
+                <TouchableOpacity style={styles.editAvatarBtn} onPress={() => handlePickDocument('avatar')}>
                   <Camera size={16} color="#FFF" />
                 </TouchableOpacity>
               </View>
@@ -284,15 +379,23 @@ export default function ProfileScreen(props: any) {
               />
               {profile?.aadhaarNumber && <Check size={16} color="#10B981" />}
             </View>
-            <TouchableOpacity style={styles.reuploadBtn} onPress={() => handlePickImage('aadhaar')}>
-               <Camera size={14} color="#4F46E5" />
-               <Text style={styles.reuploadText}>{profile?.aadhaarImage ? 'Update Aadhaar Photo' : 'Upload Aadhaar Photo'}</Text>
-               {(newAadhaarImage || profile?.aadhaarImage) && <Check size={14} color="#10B981" style={{ marginLeft: 6 }} />}
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+               <TouchableOpacity style={styles.reuploadBtn} onPress={() => handlePickDocument('aadhaar')}>
+                 <Camera size={14} color="#D4AF37" />
+                 <Text style={styles.reuploadText}>{profile?.aadhaarImage ? 'Update Aadhaar' : 'Upload Aadhaar Photo'}</Text>
+                 {(newAadhaarImage || profile?.aadhaarImage) && <Check size={14} color="#10B981" style={{ marginLeft: 6 }} />}
+              </TouchableOpacity>
+              {(profile?.aadhaarImage || newAadhaarImage) && (
+                <TouchableOpacity style={styles.viewDocBtn} onPress={() => handleViewDoc(newAadhaarImage?.uri || profile?.aadhaarImage, !newAadhaarImage)}>
+                  <FileText size={14} color="#4F46E5" />
+                  <Text style={styles.viewDocText}>View</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.miniLabel}>PAN Card Number</Text>
+            <Text style={styles.miniLabel}>(Optional) PAN Card Number</Text>
             <View style={styles.inputWrapper}>
               <FileText size={18} color="#9CA3AF" style={styles.fieldIcon} />
               <TextInput 
@@ -305,11 +408,19 @@ export default function ProfileScreen(props: any) {
               />
               {profile?.panNumber && <Check size={16} color="#10B981" />}
             </View>
-            <TouchableOpacity style={styles.reuploadBtn} onPress={() => handlePickImage('pan')}>
-               <Camera size={14} color="#4F46E5" />
-               <Text style={styles.reuploadText}>{profile?.panImage ? 'Update PAN Photo' : 'Upload PAN Photo'}</Text>
-               {(newPanImage || profile?.panImage) && <Check size={14} color="#10B981" style={{ marginLeft: 6 }} />}
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+               <TouchableOpacity style={styles.reuploadBtn} onPress={() => handlePickDocument('pan')}>
+                 <Camera size={14} color="#D4AF37" />
+                 <Text style={styles.reuploadText}>{profile?.panImage ? 'Update PAN' : 'Upload PAN Photo'}</Text>
+                 {(newPanImage || profile?.panImage) && <Check size={14} color="#10B981" style={{ marginLeft: 6 }} />}
+              </TouchableOpacity>
+              {(profile?.panImage || newPanImage) && (
+                <TouchableOpacity style={styles.viewDocBtn} onPress={() => handleViewDoc(newPanImage?.uri || profile?.panImage, !newPanImage)}>
+                  <FileText size={14} color="#4F46E5" />
+                  <Text style={styles.viewDocText}>View</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
         </View>
 
@@ -325,23 +436,39 @@ export default function ProfileScreen(props: any) {
                 <View style={[styles.inputGroup, { borderTopWidth: 1, borderTopColor: '#F3F4F6', paddingTop: 16 }]}>
                    <Text style={[styles.miniLabel, { color: '#D97706' }]}>Police Verification</Text>
                    <Text style={styles.docDesc}>Required for Care/Cooking services to ensure customer safety.</Text>
-                   <TouchableOpacity style={styles.reuploadBtn} onPress={() => handlePickImage('police')}>
-                      <Camera size={14} color="#4F46E5" />
-                      <Text style={styles.reuploadText}>{profile?.policeVerification ? 'Update Certificate' : 'Upload Certificate'}</Text>
-                      {profile?.policeVerification && <Check size={14} color="#10B981" style={{ marginLeft: 6 }} />}
-                   </TouchableOpacity>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                      <TouchableOpacity style={styles.reuploadBtn} onPress={() => handlePickDocument('police')}>
+                        <Camera size={14} color="#D4AF37" />
+                        <Text style={styles.reuploadText}>{(profile?.policeVerification || newPoliceImage) ? 'Update Cert.' : 'Upload Cert.'}</Text>
+                        {(profile?.policeVerification || newPoliceImage) && <Check size={14} color="#10B981" style={{ marginLeft: 6 }} />}
+                     </TouchableOpacity>
+                     {(profile?.policeVerification || newPoliceImage) && (
+                       <TouchableOpacity style={styles.viewDocBtn} onPress={() => handleViewDoc(newPoliceImage?.uri || profile?.policeVerification, !newPoliceImage)}>
+                         <FileText size={14} color="#4F46E5" />
+                         <Text style={styles.viewDocText}>View</Text>
+                       </TouchableOpacity>
+                     )}
+                   </View>
                 </View>
              )}
 
              {needsCert && (
                 <View style={[styles.inputGroup, { borderTopWidth: 1, borderTopColor: '#F3F4F6', paddingTop: 16 }]}>
-                   <Text style={[styles.miniLabel, { color: '#4F46E5' }]}>Trade Certification</Text>
-                   <Text style={styles.docDesc}>Required for verified professional skilled trades.</Text>
-                   <TouchableOpacity style={styles.reuploadBtn} onPress={() => handlePickImage('cert')}>
-                      <Camera size={14} color="#4F46E5" />
-                      <Text style={styles.reuploadText}>{profile?.certification ? 'Update Trade ID' : 'Upload Trade ID'}</Text>
-                      {profile?.certification && <Check size={14} color="#10B981" style={{ marginLeft: 6 }} />}
-                   </TouchableOpacity>
+                   <Text style={[styles.miniLabel, { color: '#4F46E5' }]}>Professional Certificate</Text>
+                   <Text style={styles.docDesc}>Required for verified professional skilled services.</Text>
+                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                      <TouchableOpacity style={styles.reuploadBtn} onPress={() => handlePickDocument('cert')}>
+                        <Camera size={14} color="#D4AF37" />
+                        <Text style={styles.reuploadText}>{(profile?.certification || newCertImage) ? 'Update Cert.' : 'Upload Cert.'}</Text>
+                        {(profile?.certification || newCertImage) && <Check size={14} color="#10B981" style={{ marginLeft: 6 }} />}
+                     </TouchableOpacity>
+                     {(profile?.certification || newCertImage) && (
+                       <TouchableOpacity style={styles.viewDocBtn} onPress={() => handleViewDoc(newCertImage?.uri || profile?.certification, !newCertImage)}>
+                         <FileText size={14} color="#4F46E5" />
+                         <Text style={styles.viewDocText}>View</Text>
+                       </TouchableOpacity>
+                     )}
+                   </View>
                 </View>
              )}
           </View>
@@ -439,7 +566,7 @@ export default function ProfileScreen(props: any) {
                <View style={styles.modalHeader}>
                   <Text style={styles.modalTitle}>Update Expert Skills</Text>
                   <TouchableOpacity onPress={() => setShowCategoryModal(false)}>
-                     <X size={24} color="#374151" />
+                     <X size={24} color="#111827" />
                   </TouchableOpacity>
                </View>
                <Text style={styles.modalSub}>Select the services you are expert in. This helps us assign the right jobs to you.</Text>
@@ -471,11 +598,50 @@ export default function ProfileScreen(props: any) {
          </View>
       </Modal>
 
+      {/* Document View Modal */}
+      <Modal visible={docModalVisible} animationType="fade" transparent={true}>
+         <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { maxHeight: '95%', alignItems: 'center', backgroundColor: '#000', padding: 20 }]}>
+               <View style={{ width: '100%', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 }}>
+                  <Text style={{ color: '#FFF', fontSize: 18, fontWeight: '700' }}>Document Preview</Text>
+                  <TouchableOpacity onPress={() => setDocModalVisible(false)}>
+                     <X size={24} color="#FFF" />
+                  </TouchableOpacity>
+               </View>
+                 {docUrl ? (
+                   <View style={{ width: '100%', height: '80%', justifyContent: 'center', alignItems: 'center' }}>
+                     {docUrl.toLowerCase().endsWith('.pdf') ? (
+                        <View style={{ alignItems: 'center' }}>
+                           <FileText size={100} color="#FFF" />
+                           <Text style={{ color: '#FFF', marginTop: 20, fontSize: 16 }}>PDF Document</Text>
+                           <TouchableOpacity 
+                             style={{ marginTop: 20, backgroundColor: '#4F46E5', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10 }}
+                             onPress={() => Linking.openURL(docUrl)}
+                           >
+                             <Text style={{ color: '#FFF', fontWeight: '700' }}>Open in Browser</Text>
+                           </TouchableOpacity>
+                        </View>
+                     ) : (
+                        <Image source={{ uri: docUrl }} style={{ width: '100%', height: '100%', resizeMode: 'contain' }} />
+                     )}
+                   </View>
+                 ) : (
+                 <Text style={{ color: '#000' }}>Could not load document.</Text>
+               )}
+            </View>
+         </View>
+      </Modal>
+
       <PremiumToast 
         visible={toastVisible} 
         message={toastMessage} 
         type={toastType} 
         onHide={() => setToastVisible(false)} 
+      />
+
+      <PremiumUploadModal 
+        visible={isUploading} 
+        message="Updating your professional profile and encrypting documents..." 
       />
     </View>
   );
@@ -539,11 +705,13 @@ const styles = StyleSheet.create({
   docDesc: { fontSize: 12, color: '#6B7280', marginBottom: 12, marginLeft: 4, lineHeight: 18 },
   lockedBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#6B7280', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, gap: 4 },
   lockedBadgeText: { color: '#FFF', fontSize: 9, fontWeight: '900' },
-  inputWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F9FAFB', borderRadius: 18, paddingHorizontal: 16, height: 60, borderWidth: 1.5, borderColor: '#F3F4F6' },
+  inputWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF', borderRadius: 18, paddingHorizontal: 16, height: 60, borderWidth: 1.5, borderColor: '#F3F4F6', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.02, shadowRadius: 4, elevation: 1 },
   fieldIcon: { marginRight: 12 },
   input: { flex: 1, fontSize: 16, fontWeight: '700', color: '#111827' },
-  reuploadBtn: { flexDirection: 'row', alignItems: 'center', marginTop: 12, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: '#F5F3FF', borderRadius: 12, alignSelf: 'flex-start' },
-  reuploadText: { fontSize: 12, color: '#4338CA', fontWeight: '800', marginLeft: 8 },
+  reuploadBtn: { flexDirection: 'row', alignItems: 'center', marginTop: 12, paddingHorizontal: 16, paddingVertical: 10, backgroundColor: '#FEF3C7', borderRadius: 12, alignSelf: 'flex-start' },
+  reuploadText: { fontSize: 12, color: '#92400E', fontWeight: '800', marginLeft: 8 },
+  viewDocBtn: { flexDirection: 'row', alignItems: 'center', marginTop: 12, paddingHorizontal: 16, paddingVertical: 10, backgroundColor: '#EEF2FF', borderRadius: 12, borderWidth: 1, borderColor: '#C7D2FE' },
+  viewDocText: { fontSize: 12, color: '#4F46E5', fontWeight: '800', marginLeft: 6 },
   adminNote: { fontSize: 11, color: '#9CA3AF', marginTop: 10, marginLeft: 4, fontWeight: '600', fontStyle: 'italic' },
   
   saveButton: { backgroundColor: '#4F46E5', borderRadius: 20, height: 64, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 10, shadowColor: '#4F46E5', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 8 },

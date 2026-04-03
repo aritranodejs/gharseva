@@ -35,13 +35,23 @@ class BookingController {
 
   async updateStatus(req, res) {
     const { status, otp } = req.body;
+    const uploadFiles = req.files || {};
     try {
+      const additionalUpdates = {};
+      if (uploadFiles['beforeServiceImages']) {
+        additionalUpdates.beforeServiceImages = uploadFiles['beforeServiceImages'].map(f => `/uploads/${f.filename}`);
+      }
+      if (uploadFiles['afterServiceImages']) {
+        additionalUpdates.afterServiceImages = uploadFiles['afterServiceImages'].map(f => `/uploads/${f.filename}`);
+      }
+
       const booking = await bookingService.updateBookingStatus(
         req.params.id, 
         req.worker._id, 
         status,
-        req.user ? req.user.id : null, // Not exactly correct, we just pass down
-        otp
+        null,
+        otp,
+        additionalUpdates
       );
       sendSuccess(res, booking, `Booking updated to ${status}`);
     } catch (err) {
@@ -98,6 +108,27 @@ class BookingController {
         cancelledBy
       );
       sendSuccess(res, booking, 'Booking cancelled successfully');
+    } catch (err) {
+      sendError(res, err.message, 400);
+    }
+  }
+
+  async rebroadcast(req, res) {
+    try {
+      const { id } = req.params;
+      const assignmentService = require('../services/assignmentService');
+      
+      // Verification: only the user who created it can rebroadcast
+      const booking = await bookingService.getBookingById(id, req.user.id);
+      
+      if (!['searching_worker', 'pending', 'pending_acceptance'].includes(booking.status)) {
+        return sendError(res, 'Cannot re-broadcast a job that is already accepted or completed.', 400);
+      }
+
+      // Trigger re-assignment
+      assignmentService.assignWorkerToBooking(id).catch(err => console.error('[Rebroadcast Error]', err));
+      
+      sendSuccess(res, null, 'Re-broadcasted to nearby professionals.');
     } catch (err) {
       sendError(res, err.message, 400);
     }

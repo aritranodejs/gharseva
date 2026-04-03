@@ -72,35 +72,27 @@ class BookingService {
     return finalBooking || booking;
   }
 
-  async updateBookingStatus(bookingId, workerId, status, userId, otp = null) {
+  async updateBookingStatus(bookingId, workerId, status, userId, otp = null, additionalUpdates = {}) {
     const booking = await this.bookingRepository.findById(bookingId);
     if (!booking) throw new Error('Booking not found');
 
+    const updates = { ...additionalUpdates };
     if (status === 'in_progress') {
-        booking.startedAt = new Date();
+        updates.startedAt = new Date();
     } else if (status === 'completed') {
-        booking.completedAt = new Date();
+        updates.completedAt = new Date();
     }
-    await booking.save();
-
-    const updatedBooking = await this.bookingRepository.updateStatus(bookingId, status, workerId);
-    if (!updatedBooking) throw new Error('Booking update failed or unauthorized');
 
     if (status === 'completed') {
       if (!otp || String(booking.completionOtp) !== String(otp)) {
-        // Rollback status to previous (which should be in_progress) if wrong OTP
-        await this.bookingRepository.updateStatus(bookingId, 'in_progress', workerId);
         throw new Error('Invalid Completion OTP. Ask the customer for their 4-digit PIN.');
       }
 
-      const platformFee = booking.platformFee || Math.max(29, Math.round(booking.price * 0.1));
-      const workerEarnings = booking.price - platformFee;
+      const platformFee = booking.platformFee || Math.round(booking.price * 0.1);
+      const workerEarnings = booking.price;
       
-      await this.bookingRepository.updateInternalStatus(bookingId, status, workerId);
-      // Store revenue details in booking (assuming model has these fields or we add them)
-      booking.platformFee = platformFee;
-      booking.workerEarnings = workerEarnings;
-      await booking.save();
+      updates.platformFee = platformFee;
+      updates.workerEarnings = workerEarnings;
 
       await Worker.findByIdAndUpdate(workerId, { 
         $inc: { 
@@ -109,6 +101,9 @@ class BookingService {
         } 
       });
     }
+
+    const updatedBooking = await this.bookingRepository.updateStatus(bookingId, status, workerId, updates);
+    if (!updatedBooking) throw new Error('Booking update failed or unauthorized');
 
     if (global.io) {
       global.io.to(`user_${booking.userId}`).emit('booking_status_update', { 
@@ -133,17 +128,16 @@ class BookingService {
   }
 
   async createUserBooking(userId, bookingData) {
-    // Read platform fee from ENV, default to 29 if not set or invalid
-    const envFee = parseInt(process.env.PLATFORM_FEE);
-    const platformFee = !isNaN(envFee) ? envFee : 29;
-    
+    const platformFee = Math.round(bookingData.price * 0.1);
     const totalAmount = bookingData.price + platformFee;
+    const workerEarnings = bookingData.price;
 
     const booking = await this.bookingRepository.create({
       userId,
       ...bookingData,
       platformFee,
       totalAmount,
+      workerEarnings,
       status: BOOKING_STATUS.PENDING
     });
     return booking;

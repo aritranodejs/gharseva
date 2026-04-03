@@ -21,16 +21,16 @@ const BANNERS = [
 
 // Pastel palette for premium category tiles
 const ICON_PALETTE: Record<string, { bg: string; iconColor: string }> = {
-  Sparkles:   { bg: '#F5F3FF', iconColor: '#8B5CF6' },
-  Droplets:   { bg: '#EFF6FF', iconColor: '#3B82F6' },
-  Zap:        { bg: '#FFF7ED', iconColor: '#F97316' },
-  Hammer:     { bg: '#FEF3C7', iconColor: '#D97706' },
-  Snowflake:  { bg: '#F0F9FF', iconColor: '#0EA5E9' },
-  ShieldCheck:{ bg: '#ECFDF5', iconColor: '#10B981' },
-  Utensils:   { bg: '#FFF1F2', iconColor: '#E11D48' },
-  Heart:      { bg: '#FFF1F2', iconColor: '#E11D48' },
-  Wind:       { bg: '#F0F9FF', iconColor: '#0EA5E9' },
-  User:       { bg: '#F5F3FF', iconColor: '#7C3AED' },
+  Sparkles:   { bg: '#F5F3FF', iconColor: '#7C3AED' }, // Vibrant Violet
+  Droplets:   { bg: '#ECFEFF', iconColor: '#0891B2' }, // Deep Cyan
+  Zap:        { bg: '#FFFBEB', iconColor: '#D97706' }, // Amber Gold
+  Hammer:     { bg: '#F0FDFA', iconColor: '#0D9488' }, // Teal
+  Snowflake:  { bg: '#F0F9FF', iconColor: '#0284C7' }, // Deep Sky
+  ShieldCheck:{ bg: '#F8FAFC', iconColor: '#475569' }, // Slate
+  Utensils:   { bg: '#FFF1F2', iconColor: '#E11D48' }, // Rose Red
+  Heart:      { bg: '#FEF2F2', iconColor: '#DC2626' }, // Bright Red
+  Wind:       { bg: '#F0FDFA', iconColor: '#0F766E' }, // Teal Green
+  User:       { bg: '#FAF5FF', iconColor: '#9333EA' }, // Bright Purple
 };
 
 const getIconInfo = (iconName: string) => {
@@ -58,6 +58,7 @@ export default function HomeScreen() {
   const [services, setServices] = useState<any[]>([]);
   const [popularServices, setPopularServices] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
+  const [serviceableAreas, setServiceableAreas] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [location, setLocation] = useState('New Town, Kolkata');
@@ -151,7 +152,7 @@ export default function HomeScreen() {
     setLoading(true);
     await Promise.all([
       fetchCategories(),
-      fetchServices(),
+      fetchAreasAndServices(),
       fetchSavedAddresses()
     ]);
     setLoading(false);
@@ -184,17 +185,30 @@ export default function HomeScreen() {
     }
   };
 
-  const fetchServices = async () => {
+  const fetchAreasAndServices = async () => {
     try {
+      // Fetch dynamic active serviceable areas from backend admin
+      const areasRes = await api.get('areas');
+      const areas = areasRes.data.data || [];
+      setServiceableAreas(areas);
+
+      let available = false;
+      // Check if current pincode exists in any active area's pincodes array
+      for (let area of areas) {
+        if (area.pincodes.includes(pincode)) {
+          available = true;
+          break;
+        }
+      }
+      setIsAvailable(available);
+
       const response = await api.get('services', { params: { pincode } });
-       const fetchedServices = response.data.data;
+      const fetchedServices = response.data.data;
       setServices(fetchedServices);
       setPopularServices(fetchedServices.slice(0, 3));
       
-      // Dynamic availability: If services are found for this pincode, it's available
-      setIsAvailable(fetchedServices.length > 0);
     } catch (error) {
-      console.error('Error fetching services:', error);
+      console.error('Error fetching areas and services:', error);
       setIsAvailable(false);
     } finally {
       setRefreshing(false);
@@ -397,6 +411,25 @@ export default function HomeScreen() {
                 </View>
               )}
 
+              {/* Dynamic Serviceable Areas Display */}
+              {serviceableAreas.length > 0 && (
+                <View style={styles.savedAddressesSection}>
+                  <Text style={styles.subHeader}>Popular Service Areas</Text>
+                  {serviceableAreas.map(area => (
+                    <View key={area._id} style={styles.addressItem}>
+                      <View style={[styles.locIconCirc, { backgroundColor: '#ECFDF5' }]}>
+                        <Zap size={18} color="#10B981" />
+                      </View>
+                      <View style={styles.addressInfo}>
+                        <Text style={styles.addressLabel}>{area.cityName}</Text>
+                        <Text style={styles.addressText}>{area.pincodes.join(', ')}</Text>
+                      </View>
+                    </View>
+                  ))}
+                  <View style={{ height: 10 }} />
+                </View>
+              )}
+
               <View style={styles.savedAddressesSection}>
                 <Text style={styles.subHeader}>Saved Addresses</Text>
                 {savedAddresses.length > 0 ? (
@@ -542,13 +575,27 @@ export default function HomeScreen() {
               <TouchableOpacity 
                 key={category._id} 
                 style={styles.categoryItem}
-                onPress={() => isAvailable ? navigation.navigate('CategoryServices', {
-                  category,
-                  pincode,
-                  lat: mapRegion.latitude,
-                  lng: mapRegion.longitude,
-                  fullAddress: location
-                }) : showToast('We are not yet serving in this area.', 'info')}
+                onPress={() => {
+                  if (!isAvailable) return showToast('We are not yet serving in this area.', 'info');
+                  
+                  const isComingSoon = category.name.toLowerCase().includes('premium') || 
+                                      category.name.toLowerCase().includes('luxury') ||
+                                      category.name.toLowerCase().includes('vip') ||
+                                      ['Spa', 'Massage'].some(s => category.name.includes(s));
+                  
+                  if (isComingSoon) {
+                    showToast(`${category.name} is Coming Soon! 🚀`, 'info');
+                    return;
+                  }
+
+                  navigation.navigate('CategoryServices', {
+                    category,
+                    pincode,
+                    lat: mapRegion.latitude,
+                    lng: mapRegion.longitude,
+                    fullAddress: location
+                  });
+                }}
               >
                 <View style={styles.categoryIconContainer}>
                   {catImg ? (
@@ -564,11 +611,11 @@ export default function HomeScreen() {
         </View>
 
         {/* Premium Packages Banner - UPDATED with luxury image */}
-        <TouchableOpacity 
-           style={styles.packageBanner}
-           activeOpacity={0.9}
-           onPress={() => navigation.navigate('Packages' as any)}
-        >
+         <TouchableOpacity 
+            style={styles.packageBanner}
+            activeOpacity={0.9}
+            onPress={() => showToast('Premium Household Packages are Coming Soon! ✨', 'info')}
+         >
            <Image source={require('../../assets/cleaning_premium_v2.png')} style={styles.packageBannerBg} />
            <View style={styles.packageBannerOverlay} />
            <View style={styles.pkgBannerTextGroup}>
@@ -599,13 +646,23 @@ export default function HomeScreen() {
             <TouchableOpacity 
               key={service._id} 
               style={styles.recCard}
-              onPress={() => isAvailable ? navigation.navigate('ServiceDetail', {
-                service,
-                pincode,
-                lat: mapRegion.latitude,
-                lng: mapRegion.longitude,
-                fullAddress: location
-              }) : showToast('We are not yet serving in this area.', 'info')}
+              onPress={() => {
+                if (!isAvailable) return showToast('We are not yet serving in this area.', 'info');
+                
+                const isPremium = service.name.toLowerCase().includes('premium') || 
+                                 service.name.toLowerCase().includes('luxury') ||
+                                 service.name.toLowerCase().includes('vip');
+                
+                if (isPremium) return showToast('Premium services are coming soon! ✨', 'info');
+
+                navigation.navigate('ServiceDetail', {
+                  service,
+                  pincode,
+                  lat: mapRegion.latitude,
+                  lng: mapRegion.longitude,
+                  fullAddress: location
+                });
+              }}
             >
               <Image source={{ uri: service.image }} style={styles.recCardImg} resizeMode="cover" />
               <View style={styles.recCardOverlay} />
@@ -642,13 +699,23 @@ export default function HomeScreen() {
                 <TouchableOpacity
                   key={service._id}
                   style={[styles.serviceCard, !isAvailable && { opacity: 0.6 }]}
-                  onPress={() => isAvailable ? navigation.navigate('ServiceDetail', {
-                    service,
-                    pincode,
-                    lat: mapRegion.latitude,
-                    lng: mapRegion.longitude,
-                    fullAddress: location
-                  }) : showToast('We are not yet serving in this area.', 'info')}
+                  onPress={() => {
+                    if (!isAvailable) return showToast('We are not yet serving in this area.', 'info');
+                    
+                    const isPremium = service.name.toLowerCase().includes('premium') || 
+                                     service.name.toLowerCase().includes('luxury') ||
+                                     service.name.toLowerCase().includes('vip');
+                    
+                    if (isPremium) return showToast('Premium services are coming soon! ✨', 'info');
+
+                    navigation.navigate('ServiceDetail', {
+                      service,
+                      pincode,
+                      lat: mapRegion.latitude,
+                      lng: mapRegion.longitude,
+                      fullAddress: location
+                    });
+                  }}
                 >
                   <View style={styles.cardMain}>
                     <View style={styles.serviceTextInfo}>

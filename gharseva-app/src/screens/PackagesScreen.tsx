@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar, ActivityIndicator, Alert, TextInput, KeyboardAvoidingView, Platform, Modal, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowLeft, Package as PackageIcon, CheckCircle2, ShieldCheck, CreditCard, Zap, ChevronRight, MapPin } from 'lucide-react-native';
+import { ArrowLeft, Package as PackageIcon, CheckCircle2, ShieldCheck, CreditCard, Zap, ChevronRight, MapPin, Star, Sparkles, Award, Crown } from 'lucide-react-native';
 import api from '../services/api';
 import AddressSelectorModal from '../components/AddressSelectorModal';
 import PremiumToast from '../components/PremiumToast';
@@ -176,34 +176,54 @@ export default function PackagesScreen({ navigation }: Props) {
                  return (
                    <TouchableOpacity
                      key={tier._id}
-                     style={[styles.tierCard, isSelected && styles.tierCardActive]}
+                     style={[styles.tierCard, isSelected && styles.tierCardActive, selectedPkg.isPremium && isSelected && styles.tierCardPremiumActive]}
                      activeOpacity={0.9}
                      onPress={() => setSelectedTier(tier)}
                    >
                      {isPopular && (
-                        <View style={styles.popularBadge}>
+                        <View style={[styles.popularBadge, selectedPkg.isPremium && { backgroundColor: '#D4AF37' }]}>
                           <Text style={styles.popularText}>MOST POPULAR</Text>
                         </View>
                      )}
                      <View style={styles.tierRadioRow}>
-                        <View style={[styles.radio, isSelected && styles.radioActive]}>
-                           {isSelected && <View style={styles.radioDot} />}
+                        <View style={[styles.radio, isSelected && styles.radioActive, selectedPkg.isPremium && isSelected && { borderColor: '#D4AF37' }]}>
+                           {isSelected && <View style={[styles.radioDot, selectedPkg.isPremium && { backgroundColor: '#D4AF37' }]} />}
                         </View>
-                        <Text style={[styles.tierLabelText, isSelected && { color: '#4F46E5' }]}>{tier.label}</Text>
+                        <Text style={[styles.tierLabelText, isSelected && { color: selectedPkg.isPremium ? '#D4AF37' : '#4F46E5' }]}>{tier.label}</Text>
                      </View>
                      
                      <View style={styles.tierPriceBox}>
-                        <Text style={[styles.tierPriceText, isSelected && { color: '#4F46E5' }]}>₹{tier.monthlyPrice}</Text>
+                        <Text style={[styles.tierPriceText, isSelected && { color: selectedPkg.isPremium ? '#D4AF37' : '#4F46E5' }]}>₹{tier.monthlyPrice}</Text>
                         <Text style={styles.tierPerMonth}>/ month</Text>
                      </View>
                      
-                     <Text style={styles.tierSavingsText}>
-                        Save ₹{((selectedPkg.perVisitPrice * tier.frequency * 4) - tier.monthlyPrice)} compared to individual
-                     </Text>
+                     <View style={[styles.savingsBadge, selectedPkg.isPremium && { backgroundColor: '#FFF9E5' }]}>
+                        <Text style={[styles.tierSavingsText, selectedPkg.isPremium && { color: '#B8860B' }]}>
+                           Save ₹{((selectedPkg.perVisitPrice * tier.frequency * 4) - tier.monthlyPrice)} / month
+                        </Text>
+                     </View>
                    </TouchableOpacity>
                  );
                })}
             </View>
+
+            {/* Premium Perks Section */}
+            {selectedPkg.isPremium && selectedPkg.perks?.length > 0 && (
+              <View style={styles.premiumPerksOverlay}>
+                 <View style={styles.premiumHeaderRow}>
+                    <Crown size={20} color="#D4AF37" fill="#D4AF37" />
+                    <Text style={styles.premiumHeaderTitle}>LUXURY PERKS</Text>
+                 </View>
+                 <View style={styles.perksGrid}>
+                    {selectedPkg.perks.map((perk: string, idx: number) => (
+                      <View key={idx} style={styles.perkItem}>
+                        <Star size={14} color="#D4AF37" fill="#D4AF37" />
+                        <Text style={styles.perkText}>{perk}</Text>
+                      </View>
+                    ))}
+                 </View>
+              </View>
+            )}
 
             <View style={styles.safetyBox}>
                <ShieldCheck size={18} color="#059669" />
@@ -357,19 +377,28 @@ const styles = StyleSheet.create({
   chooseTierTitle: { fontSize: 18, fontWeight: '900', color: '#111827', marginBottom: 16 },
   
   tiersContainer: { gap: 16 },
-  tierCard: { backgroundColor: '#FFF', borderRadius: 20, padding: 20, borderWidth: 2, borderColor: '#F3F4F6', position: 'relative' },
-  tierCardActive: { borderColor: '#4F46E5', backgroundColor: '#F8FAFC' },
-  popularBadge: { position: 'absolute', top: -12, left: 20, backgroundColor: '#F59E0B', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12 },
-  popularText: { color: '#FFF', fontSize: 10, fontWeight: '900', letterSpacing: 1 },
+  tierCard: { backgroundColor: '#FFF', borderRadius: 24, padding: 20, borderWidth: 2, borderColor: '#F3F4F6', position: 'relative' },
+  tierCardActive: { borderColor: '#4F46E5', backgroundColor: '#F8FAFC', shadowColor: '#4F46E5', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 2 },
+  tierCardPremiumActive: { borderColor: '#D4AF37', backgroundColor: '#FFFDF5', shadowColor: '#D4AF37' },
+  popularBadge: { position: 'absolute', top: -14, left: 24, backgroundColor: '#F59E0B', paddingHorizontal: 14, paddingVertical: 5, borderRadius: 12, zIndex: 10 },
+  popularText: { color: '#FFF', fontSize: 10, fontWeight: '900', letterSpacing: 1.2 },
   tierRadioRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
-  radio: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: '#D1D5DB', justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+  radio: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: '#E5E7EB', justifyContent: 'center', alignItems: 'center', marginRight: 12 },
   radioActive: { borderColor: '#4F46E5' },
   radioDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: '#4F46E5' },
-  tierLabelText: { fontSize: 18, fontWeight: '800', color: '#374151' },
-  tierPriceBox: { flexDirection: 'row', alignItems: 'baseline', marginBottom: 8 },
+  tierLabelText: { fontSize: 18, fontWeight: '900', color: '#111827' },
+  tierPriceBox: { flexDirection: 'row', alignItems: 'baseline', marginBottom: 12 },
   tierPriceText: { fontSize: 32, fontWeight: '900', color: '#111827' },
   tierPerMonth: { fontSize: 14, fontWeight: '600', color: '#6B7280', marginLeft: 6 },
-  tierSavingsText: { fontSize: 12, fontWeight: '600', color: '#10B981', backgroundColor: '#ECFDF5', alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
+  savingsBadge: { backgroundColor: '#ECFDF5', alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10 },
+  tierSavingsText: { fontSize: 12, fontWeight: '800', color: '#10B981' },
+
+  premiumPerksOverlay: { marginTop: 24, padding: 20, backgroundColor: '#1E1B4B', borderRadius: 24, borderWidth: 1, borderColor: '#D4AF3733' },
+  premiumHeaderRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
+  premiumHeaderTitle: { fontSize: 10, fontWeight: '900', color: '#D4AF37', marginLeft: 8, letterSpacing: 2 },
+  perksGrid: { gap: 10 },
+  perkItem: { flexDirection: 'row', alignItems: 'center' },
+  perkText: { marginLeft: 12, fontSize: 13, color: '#E0E7FF', fontWeight: '600' },
 
   safetyBox: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#ECFDF5', padding: 16, borderRadius: 16, marginTop: 24 },
   safetyBoxText: { marginLeft: 10, fontSize: 13, fontWeight: '700', color: '#065F46' },

@@ -17,7 +17,8 @@ const packageSchema = mongoose.Schema(
         monthlyPrice: { type: Number },               // 1499, 2499, 3999
       }
     ],
-
+    isPremium: { type: Boolean, default: false },
+    perks: [{ type: String }],                        // ["VIP Support", "Priority Pro"]
     isActive: { type: Boolean, default: true },
   },
   { timestamps: true }

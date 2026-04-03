@@ -8,7 +8,8 @@ import { io, Socket } from 'socket.io-client';
 import api, { getImageUrl } from '../services/api';
 import { getCurrentWorkerLocation } from '../utils/helpers';
 import { registerForPushNotifications, showJobNotification, clearJobNotifications } from '../services/NotificationService';
-import { Bell as BellIcon, Briefcase as BriefcaseIcon, MapPin as MapPinIcon, CheckCircle2 as CheckCircle2Icon, Clock as ClockIcon, Star as StarIcon, Wallet as WalletIcon, ChevronRight as ChevronRightIcon, User as UserIcon, HelpCircle as HelpIcon, ShieldCheck as ShieldCheckIcon, Zap, Droplets, Sparkles, Hammer, Snowflake, Utensils, Heart, Wind } from 'lucide-react-native';
+import * as ImagePicker from 'expo-image-picker';
+import { Bell as BellIcon, Briefcase as BriefcaseIcon, MapPin as MapPinIcon, CheckCircle2 as CheckCircle2Icon, Clock as ClockIcon, Star as StarIcon, Wallet as WalletIcon, ChevronRight as ChevronRightIcon, User as UserIcon, HelpCircle as HelpIcon, ShieldCheck as ShieldCheckIcon, Zap, Droplets, Sparkles, Hammer, Snowflake, Utensils, Heart, Wind, Camera } from 'lucide-react-native';
 import PremiumToast, { ToastType } from '../components/PremiumToast';
 
 const Bell = BellIcon as any;
@@ -61,9 +62,14 @@ interface ActiveJob {
   address: string;
   status: string;
   price: number;
+  platformFee?: number;
+  workerEarnings?: number;
+  totalAmount?: number;
   subscriptionId?: string;
   acceptedAt?: string;
   startedAt?: string;
+  beforeServiceImages?: string[];
+  afterServiceImages?: string[];
 }
 
 const SOCKET_URL = api.defaults.baseURL?.replace('/api', '') || 'http://192.168.1.6:5000';
@@ -238,11 +244,56 @@ export default function HomeScreen(props: any) {
     }
   };
 
-  const updateJobStatus = async (bookingId: string, status: string) => {
+  const [serviceImages, setServiceImages] = useState<Record<string, { before: any[], after: any[] }>>({});
+
+  const takeServicePhoto = async (bookingId: string, type: 'before' | 'after') => {
     try {
-      await api.post(`/workers/bookings/${bookingId}/status`, { status });
-      showToast(`Job marked as ${status.replace('_', ' ')}`, 'success');
-      fetchActiveJobs();
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.6,
+      });
+
+      if (!result.canceled) {
+        const current = serviceImages[bookingId] || { before: [], after: [] };
+        setServiceImages({
+          ...serviceImages,
+          [bookingId]: {
+            ...current,
+            [type]: [...current[type], result.assets[0]]
+          }
+        });
+      }
+    } catch (err) {
+      showToast('Camera failed', 'error');
+    }
+  };
+
+  const updateJobStatus = async (bookingId: string, status: string) => {
+    const images = serviceImages[bookingId]?.before || [];
+    if (status === 'in_progress' && images.length === 0) {
+      return showToast('Please take a "Before Service" photo.', 'error');
+    }
+
+    try {
+       if (status === 'in_progress') {
+          const formData = new FormData();
+          formData.append('status', status);
+          images.forEach((img, index) => {
+            formData.append('beforeServiceImages', {
+              uri: img.uri,
+              type: 'image/jpeg',
+              name: `before_${index}.jpg`
+            } as any);
+          });
+          await api.post(`/workers/bookings/${bookingId}/status`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+          });
+       } else {
+          await api.post(`/workers/bookings/${bookingId}/status`, { status });
+       }
+       showToast(`Job marked as ${status.replace('_', ' ')}`, 'success');
+       fetchActiveJobs();
     } catch (err: any) {
       showToast('Failed to update status.', 'error');
     }
@@ -264,15 +315,33 @@ export default function HomeScreen(props: any) {
 
   const handleCompleteJob = async () => {
     if (!completionPin || completionPin.length !== 4) return showToast('Enter 4-digit PIN', 'error');
+    
+    const images = serviceImages[selectedJobId!]?.after || [];
+    if (images.length === 0) return showToast('Please take an "After Service" photo.', 'error');
+
     setCompleting(true);
     try {
-      await api.post(`/workers/bookings/${selectedJobId}/status`, { status: 'completed', otp: completionPin });
+      const formData = new FormData();
+      formData.append('status', 'completed');
+      formData.append('otp', completionPin);
+      images.forEach((img, index) => {
+        formData.append('afterServiceImages', {
+          uri: img.uri,
+          type: 'image/jpeg',
+          name: `after_${index}.jpg`
+        } as any);
+      });
+
+      await api.post(`/workers/bookings/${selectedJobId}/status`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      
       showToast('Job completed!', 'success');
       setCompleteModalVisible(false);
       setCompletionPin('');
       fetchActiveJobs();
     } catch (err: any) {
-      showToast(err.response?.data?.message || 'Invalid PIN', 'error');
+      showToast(err.response?.data?.message || 'Invalid PIN or upload failed', 'error');
     } finally { setCompleting(false); }
   };
 
@@ -374,12 +443,35 @@ export default function HomeScreen(props: any) {
                   />
                   <View style={styles.customerInfo}>
                     <Text style={styles.customerName}>{job.userId.name}</Text>
-                    <View style={styles.verifiedTag}><ShieldCheck size={10} color="#10B981" /><Text style={styles.verifiedText}>VERIFIED CUSTOMER</Text></View>
+                    <View style={styles.contactRow}>
+                       <Text style={styles.customerPhone}>{job.userId.phoneNumber || 'No phone'}</Text>
+                       <View style={styles.verifiedTag}><ShieldCheck size={10} color="#10B981" /><Text style={styles.verifiedText}>VERIFIED CUSTOMER</Text></View>
+                    </View>
                   </View>
                 </View>
               )}
 
               <View style={styles.locationRow}><MapPin size={14} color="#6B7280" /><Text style={styles.jobAddress} numberOfLines={1}>{job.address}</Text></View>
+
+              {/* Pricing Breakdown */}
+              <View style={styles.earningsBreakdown}>
+                 <View style={styles.earningRow}>
+                    <Text style={styles.earningLabel}>Customer Paid</Text>
+                    <Text style={styles.earningValue}>₹{job.totalAmount || job.price + (job.platformFee || 29)}</Text>
+                 </View>
+                 <View style={styles.earningRow}>
+                    <Text style={styles.earningSubLabel}>- Platform Fee (Customer)</Text>
+                    <Text style={styles.earningSubValue}>₹{job.platformFee || 29}</Text>
+                 </View>
+                 <View style={[styles.earningRow, { marginTop: 4, paddingTop: 4, borderTopWidth: 1, borderTopColor: '#F3F4F6' }]}>
+                    <Text style={styles.earningLabel}>Service Value</Text>
+                    <Text style={styles.earningValue}>₹{job.price}</Text>
+                 </View>
+                 <View style={[styles.earningRow, { marginTop: 8, padding: 8, backgroundColor: '#F0FDF4', borderRadius: 8 }]}>
+                    <Text style={[styles.earningLabel, { color: '#065F46' }]}>YOUR NET EARNINGS</Text>
+                    <Text style={[styles.earningValue, { color: '#059669', fontSize: 18 }]}>₹{job.workerEarnings || job.price}</Text>
+                 </View>
+              </View>
 
               {/* Active Job Tracking */}
               <View style={styles.trackingContainer}>
@@ -394,6 +486,74 @@ export default function HomeScreen(props: any) {
                       <Text style={styles.timelineText}>Started Work: {job.startedAt ? new Date(job.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now'}</Text>
                    </View>
                  )}
+              </View>
+
+              {/* Service Photos Evidence (Always visible if images exist) */}
+              {((job.beforeServiceImages?.length || 0) > 0 || (job.afterServiceImages?.length || 0) > 0 || (serviceImages[job._id]?.before?.length || 0) > 0 || (serviceImages[job._id]?.after?.length || 0) > 0) && (
+                <View style={[styles.evidenceContainer, { backgroundColor: '#F9FAFB', padding: 12, borderRadius: 16 }]}>
+                  {((job.beforeServiceImages?.length || 0) > 0 || (serviceImages[job._id]?.before?.length || 0) > 0) && (
+                    <View style={{ marginBottom: 12 }}>
+                      <Text style={styles.evidenceTitle}>Before Service Evidence</Text>
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.evidenceScroll}>
+                        {job.beforeServiceImages?.map((img, i) => (
+                          <Image key={i} source={{ uri: getImageUrl(img) || '' }} style={styles.evidenceImage} />
+                        ))}
+                        {serviceImages[job._id]?.before?.map((img, i) => (
+                          <View key={`local-b-${i}`} style={styles.localImageWrapper}>
+                            <Image source={{ uri: img.uri }} style={[styles.evidenceImage, { opacity: 0.6 }]} />
+                            <View style={styles.unsavedBadge}><Text style={styles.unsavedText}>NEW</Text></View>
+                          </View>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  )}
+                  {((job.afterServiceImages?.length || 0) > 0 || (serviceImages[job._id]?.after?.length || 0) > 0) && (
+                    <View>
+                      <Text style={styles.evidenceTitle}>After Service Evidence</Text>
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.evidenceScroll}>
+                        {job.afterServiceImages?.map((img, i) => (
+                          <Image key={i} source={{ uri: getImageUrl(img) || '' }} style={styles.evidenceImage} />
+                        ))}
+                        {serviceImages[job._id]?.after?.map((img, i) => (
+                          <View key={`local-a-${i}`} style={styles.localImageWrapper}>
+                            <Image source={{ uri: img.uri }} style={[styles.evidenceImage, { opacity: 0.6 }]} />
+                            <View style={styles.unsavedBadge}><Text style={styles.unsavedText}>NEW</Text></View>
+                          </View>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  )}
+                </View>
+              )}
+
+              {/* Photo Capture Section */}
+              <View style={styles.photoContainer}>
+                {job.status === 'confirmed' && (
+                  <TouchableOpacity 
+                    style={[styles.photoBtn, (serviceImages[job._id]?.before?.length || 0) > 0 && styles.activePhotoBtn]} 
+                    onPress={() => takeServicePhoto(job._id, 'before')}
+                  >
+                    <Camera size={18} color={(serviceImages[job._id]?.before?.length || 0) > 0 ? '#10B981' : '#4F46E5'} />
+                    <Text style={[styles.photoBtnText, (serviceImages[job._id]?.before?.length || 0) > 0 && styles.activePhotoBtnText]}>
+                      {(serviceImages[job._id]?.before?.length || 0) > 0 
+                        ? `Before Photo Captured (${serviceImages[job._id].before.length})` 
+                        : 'Take "Before" Photo'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                {job.status === 'in_progress' && (
+                  <TouchableOpacity 
+                    style={[styles.photoBtn, (serviceImages[job._id]?.after?.length || 0) > 0 && styles.activePhotoBtn]} 
+                    onPress={() => takeServicePhoto(job._id, 'after')}
+                  >
+                    <Camera size={18} color={(serviceImages[job._id]?.after?.length || 0) > 0 ? '#10B981' : '#10B981'} />
+                    <Text style={[styles.photoBtnText, (serviceImages[job._id]?.after?.length || 0) > 0 && styles.activePhotoBtnText]}>
+                      {(serviceImages[job._id]?.after?.length || 0) > 0 
+                        ? `After Photo Captured (${serviceImages[job._id].after.length})` 
+                        : 'Take "After" Photo'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
               </View>
 
               <View style={styles.actionRow}>
@@ -427,9 +587,9 @@ export default function HomeScreen(props: any) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FAFB' },
+  container: { flex: 1, backgroundColor: '#F3F4F6' },
   centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 60, paddingBottom: 20, backgroundColor: '#FFF' },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 60, paddingBottom: 24, backgroundColor: '#FFF', borderBottomLeftRadius: 30, borderBottomRightRadius: 30, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 4 },
   userInfo: { flexDirection: 'row', alignItems: 'center' },
   avatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#F3F4F6' },
   userText: { marginLeft: 12 },
@@ -453,12 +613,12 @@ const styles = StyleSheet.create({
   emptyCard: { padding: 40, alignItems: 'center', backgroundColor: '#FFF', borderRadius: 20 },
   emptyTitle: { fontSize: 16, fontWeight: '800', color: '#374151', marginTop: 12 },
   emptySub: { fontSize: 13, color: '#9CA3AF', textAlign: 'center', marginTop: 4 },
-  jobCard: { backgroundColor: '#FFF', borderRadius: 24, padding: 20, marginBottom: 16, elevation: 3 },
-  premiumCard: { borderWidth: 1, borderColor: '#4F46E5', backgroundColor: '#F5F3FF' },
-  jobHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  jobCard: { backgroundColor: '#FFF', borderRadius: 28, padding: 24, marginBottom: 18, shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.05, shadowRadius: 15, elevation: 4, borderWidth: 1, borderColor: '#F3F4F6' },
+  premiumCard: { borderWidth: 1.5, borderColor: '#D4AF37', backgroundColor: '#FFFAED' },
+  jobHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   serviceBox: { flexDirection: 'row', alignItems: 'center' },
-  jobIconBack: { width: 40, height: 40, borderRadius: 10, backgroundColor: '#EEF2FF', justifyContent: 'center', alignItems: 'center', marginRight: 12 },
-  jobService: { fontSize: 16, fontWeight: '900', color: '#111827' },
+  jobIconBack: { width: 48, height: 48, borderRadius: 16, backgroundColor: '#EEF2FF', justifyContent: 'center', alignItems: 'center', marginRight: 14 },
+  jobService: { fontSize: 17, fontWeight: '900', color: '#111827' },
   statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
   statusText: { fontSize: 10, fontWeight: '900' },
   customerCard: { flexDirection: 'row', alignItems: 'center', padding: 12, backgroundColor: '#F9FAFB', borderRadius: 12, marginBottom: 12 },
@@ -469,10 +629,10 @@ const styles = StyleSheet.create({
   verifiedText: { color: '#10B981', fontSize: 8, fontWeight: '900', marginLeft: 4 },
   locationRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   jobAddress: { fontSize: 13, color: '#6B7280', marginLeft: 6, flex: 1 },
-  actionRow: { marginTop: 4 },
-  startBtn: { backgroundColor: '#4F46E5', height: 44, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-  completeBtn: { backgroundColor: '#10B981', height: 44, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-  btnText: { color: '#FFF', fontSize: 14, fontWeight: '800' },
+  actionRow: { marginTop: 12 },
+  startBtn: { backgroundColor: '#4F46E5', height: 48, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
+  completeBtn: { backgroundColor: '#10B981', height: 48, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
+  btnText: { color: '#FFF', fontSize: 15, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1 },
   newJobBanner: { marginHorizontal: 20, marginBottom: 10, padding: 16, backgroundColor: '#4F46E5', borderRadius: 16, flexDirection: 'row', justifyContent: 'space-between' },
   bannerLeft: { flex: 1 },
   bannerTitle: { color: '#FFF', fontSize: 14, fontWeight: '900' },
@@ -499,5 +659,32 @@ const styles = StyleSheet.create({
   timelineItem: { flexDirection: 'row', alignItems: 'center', marginBottom: 4, paddingLeft: 4 },
   timelineDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#E5E7EB', marginRight: 10 },
   timelineLine: { position: 'absolute', left: 7, top: 10, bottom: -4, width: 1, backgroundColor: '#E5E7EB' },
-  timelineText: { fontSize: 12, color: '#6B7280', fontWeight: '700' }
+  timelineText: { fontSize: 12, color: '#6B7280', fontWeight: '700' },
+
+  // Photo Section Styles
+  photoContainer: { marginBottom: 16 },
+  photoBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F9FAFB', padding: 12, borderRadius: 12, borderStyle: 'dashed', borderWidth: 1, borderColor: '#D1D5DB' },
+  activePhotoBtn: { backgroundColor: '#ECFDF5', borderColor: '#10B981', borderStyle: 'solid' },
+  photoBtnText: { marginLeft: 8, fontSize: 13, fontWeight: '700', color: '#4B5563' },
+  activePhotoBtnText: { color: '#065F46' },
+  
+  // New Transparency Styles
+  earningsBreakdown: { marginBottom: 20, padding: 12, backgroundColor: '#FAFAFA', borderRadius: 16, borderWidth: 1, borderColor: '#F1F5F9' },
+  earningRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  earningLabel: { fontSize: 13, fontWeight: '900', color: '#1E1B4B' },
+  earningValue: { fontSize: 14, fontWeight: '900', color: '#1E1B4B' },
+  earningSubLabel: { fontSize: 11, color: '#64748B', fontWeight: '700' },
+  earningSubValue: { fontSize: 11, color: '#64748B', fontWeight: '800' },
+  
+  // Evidence Styles
+  evidenceContainer: { marginBottom: 20 },
+  evidenceTitle: { fontSize: 12, fontWeight: '900', color: '#1E1B4B', textTransform: 'uppercase', marginBottom: 10, letterSpacing: 0.5 },
+  evidenceScroll: { gap: 10 },
+  evidenceImage: { width: 80, height: 80, borderRadius: 12, backgroundColor: '#F3F4F6' },
+  localImageWrapper: { position: 'relative' },
+  unsavedBadge: { position: 'absolute', top: 4, right: 4, backgroundColor: '#4F46E5', paddingHorizontal: 4, paddingVertical: 2, borderRadius: 4 },
+  unsavedText: { color: '#FFF', fontSize: 7, fontWeight: '900' },
+  
+  contactRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
+  customerPhone: { fontSize: 12, fontWeight: '700', color: '#4B5563', marginRight: 10 }
 });

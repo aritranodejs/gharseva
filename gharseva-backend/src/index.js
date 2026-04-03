@@ -42,6 +42,7 @@ app.use('/api/help', require('./routes/help'));
 app.use('/api/packages', require('./routes/packages'));
 app.use('/api/subscriptions', require('./routes/subscriptions'));
 app.use('/api/workers', require('./routes/workers'));
+app.use('/api/areas', require('./routes/areaRoutes'));
 
 // Catch-all Error// 404 Handler
 app.use((req, res, next) => {

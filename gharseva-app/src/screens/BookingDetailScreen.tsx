@@ -51,6 +51,9 @@ export default function BookingDetailScreen({ route, navigation }: any) {
   const [toastVisible, setToastVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState<'success' | 'error' | 'info'>('info');
+  const [rebroadcasting, setRebroadcasting] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [imageModalVisible, setImageModalVisible] = useState(false);
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     setToastMessage(message);
@@ -129,6 +132,24 @@ export default function BookingDetailScreen({ route, navigation }: any) {
     } finally {
       setCancelling(false);
     }
+  };
+
+  const handleRebroadcast = async () => {
+    setRebroadcasting(true);
+    try {
+      await api.post(`bookings/${bookingId}/rebroadcast`);
+      showToast('Search re-triggered! Professionals near you are being notified again.', 'success');
+    } catch (err: any) {
+      console.error('Error re-broadcasting:', err);
+      showToast(err.response?.data?.message || 'Failed to re-trigger search', 'error');
+    } finally {
+      setRebroadcasting(false);
+    }
+  };
+
+  const handleImagePress = (uri: string) => {
+    setSelectedImage(uri);
+    setImageModalVisible(true);
   };
 
   const getStatusColor = (status: string) => {
@@ -309,12 +330,62 @@ export default function BookingDetailScreen({ route, navigation }: any) {
         ) : booking.status === 'cancelled' ? (
           <View style={[styles.searchingBox, { borderColor: '#FECACA', backgroundColor: '#FEF2F2' }]}>
              <AlertCircle color="#EF4444" size={28} style={{ marginBottom: 12 }} />
-             <Text style={[styles.searchingText, { color: '#EF4444' }]}>This booking has been cancelled.</Text>
+             <Text style={[styles.searchingText, { color: '#EF4444', marginBottom: 0 }]}>This booking has been cancelled.</Text>
           </View>
         ) : (
           <View style={styles.searchingBox}>
-             <ActivityIndicator color="#4F46E5" style={{ marginBottom: 12 }} />
+             <ActivityIndicator color="#4F46E5" style={{ marginBottom: 16 }} />
              <Text style={styles.searchingText}>Finding the best professional near you...</Text>
+             
+             {booking.status === 'searching_worker' && (
+               <TouchableOpacity 
+                 style={[styles.rebroadcastBtn, { opacity: rebroadcasting ? 0.7 : 1 }]} 
+                 onPress={handleRebroadcast}
+                 disabled={rebroadcasting}
+               >
+                 {rebroadcasting ? (
+                   <ActivityIndicator size="small" color="#FFFFFF" />
+                 ) : (
+                   <>
+                     <Zap size={16} color="#FFFFFF" />
+                     <Text style={styles.rebroadcastText}>Retry Finding Pro</Text>
+                   </>
+                 )}
+               </TouchableOpacity>
+             )}
+          </View>
+        )}
+
+        {/* ── Service Evidence (Before/After Photos) ── */}
+        {((booking.beforeServiceImages?.length || 0) > 0 || (booking.afterServiceImages?.length || 0) > 0) && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Service Evidence</Text>
+            <View style={styles.evidenceCard}>
+              {booking.beforeServiceImages?.length > 0 && (
+                <View style={{ marginBottom: 16 }}>
+                  <Text style={styles.evidenceLabel}>Before Service</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.evidenceScroll}>
+                    {booking.beforeServiceImages.map((img: string, i: number) => (
+                      <TouchableOpacity key={i} onPress={() => handleImagePress(getImageUrl(img) || '')}>
+                        <Image source={{ uri: getImageUrl(img) || '' }} style={styles.evidenceImage} />
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+              {booking.afterServiceImages?.length > 0 && (
+                <View>
+                  <Text style={styles.evidenceLabel}>After Service</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.evidenceScroll}>
+                    {booking.afterServiceImages.map((img: string, i: number) => (
+                      <TouchableOpacity key={i} onPress={() => handleImagePress(getImageUrl(img) || '')}>
+                        <Image source={{ uri: getImageUrl(img) || '' }} style={styles.evidenceImage} />
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+            </View>
           </View>
         )}
 
@@ -354,13 +425,13 @@ export default function BookingDetailScreen({ route, navigation }: any) {
                  <Text style={styles.priceValue}>₹{booking.price}</Text>
               </View>
               <View style={styles.priceRow}>
-                 <Text style={styles.priceLabel}>Platform Fee</Text>
-                 <Text style={styles.priceValue}>₹{booking.platformFee || 29}</Text>
+                 <Text style={styles.priceLabel}>Platform Fee (10%)</Text>
+                 <Text style={styles.priceValue}>₹{booking.platformFee || Math.round(booking.price * 0.1)}</Text>
               </View>
               <View style={styles.divider} />
               <View style={styles.priceRow}>
-                 <Text style={styles.totalLabel}>Total Payable</Text>
-                 <Text style={styles.totalValue}>₹{booking.totalAmount || (booking.price + (booking.platformFee || 29))}</Text>
+                 <Text style={styles.totalLabel}>Total Paid</Text>
+                 <Text style={styles.totalValue}>₹{booking.totalAmount || (booking.price + Math.round(booking.price * 0.1))}</Text>
               </View>
            </View>
         </View>
@@ -430,6 +501,36 @@ export default function BookingDetailScreen({ route, navigation }: any) {
         type={toastType} 
         onHide={() => setToastVisible(false)} 
       />
+
+      {/* Image Popup Modal */}
+      <Modal
+        visible={imageModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setImageModalVisible(false)}
+      >
+        <TouchableOpacity 
+          style={styles.imageModalOverlay} 
+          activeOpacity={1} 
+          onPress={() => setImageModalVisible(false)}
+        >
+          <View style={styles.imageModalContent}>
+            {selectedImage && (
+              <Image 
+                source={{ uri: selectedImage }} 
+                style={styles.fullImage} 
+                resizeMode="contain" 
+              />
+            )}
+            <TouchableOpacity 
+              style={styles.closeImageBtn} 
+              onPress={() => setImageModalVisible(false)}
+            >
+              <Text style={styles.closeImageText}>Close View</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
@@ -466,7 +567,9 @@ const styles = StyleSheet.create({
   ratingText: { fontSize: 13, color: '#F59E0B', fontWeight: 'bold', marginLeft: 4 },
   callBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#10B981', justifyContent: 'center', alignItems: 'center' },
   searchingBox: { padding: 32, alignItems: 'center', backgroundColor: '#EEF2FF', borderRadius: 24, borderStyle: 'dashed', borderWidth: 2, borderColor: '#C7D2FE' },
-  searchingText: { fontSize: 14, color: '#4F46E5', fontWeight: '700', textAlign: 'center' },
+  searchingText: { fontSize: 14, color: '#4F46E5', fontWeight: '700', textAlign: 'center', marginBottom: 20 },
+  rebroadcastBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#4F46E5', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 16, shadowColor: '#4F46E5', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
+  rebroadcastText: { color: '#FFFFFF', fontWeight: '800', marginLeft: 8, fontSize: 14 },
   priceCard: { backgroundColor: '#FFFFFF', borderRadius: 24, padding: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 },
   priceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginVertical: 4 },
   priceLabel: { fontSize: 14, color: '#6B7280', fontWeight: '500' },
@@ -504,4 +607,17 @@ const styles = StyleSheet.create({
   timelineTitlePending: { color: '#9CA3AF' },
   timelineTime: { fontSize: 12, color: '#6B7280', marginTop: 4, fontWeight: '600' },
   timelineStatus: { fontSize: 12, color: '#9CA3AF', marginTop: 4, fontStyle: 'italic', fontWeight: '500' },
+
+  // Evidence Gallery Styles
+  evidenceCard: { backgroundColor: '#FFFFFF', borderRadius: 24, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 },
+  evidenceLabel: { fontSize: 12, fontWeight: '800', color: '#9CA3AF', textTransform: 'uppercase', marginBottom: 8, letterSpacing: 0.5 },
+  evidenceScroll: { gap: 12 },
+  evidenceImage: { width: 100, height: 100, borderRadius: 16, backgroundColor: '#F3F4F6' },
+
+  // Image Modal Styles
+  imageModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' },
+  imageModalContent: { width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  fullImage: { width: '100%', height: '70%', borderRadius: 12 },
+  closeImageBtn: { marginTop: 30, paddingHorizontal: 30, paddingVertical: 12, borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.2)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' },
+  closeImageText: { color: '#FFFFFF', fontWeight: '800', fontSize: 14 }
 });

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, ScrollView, Image, StatusBar } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { ShieldCheck as ShieldCheckIcon, ArrowLeft as ArrowLeftIcon, Image as ImageIconLucide, Briefcase as BriefcaseIcon, Lock as LockIcon, Phone as PhoneIcon, User as UserIcon, CheckCircle2 as CheckCircle2Icon } from 'lucide-react-native';
+import * as DocumentPicker from 'expo-document-picker';
+import { ShieldCheck as ShieldCheckIcon, ArrowLeft as ArrowLeftIcon, Image as ImageIconLucide, Briefcase as BriefcaseIcon, Lock as LockIcon, Phone as PhoneIcon, User as UserIcon, CheckCircle2 as CheckCircle2Icon, Camera, FileText } from 'lucide-react-native';
 
 const ShieldCheck = ShieldCheckIcon as any;
 const ArrowLeft = ArrowLeftIcon as any;
@@ -14,6 +15,7 @@ const CheckCircle2 = CheckCircle2Icon as any;
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import api from '../services/api';
 import PremiumToast from '../components/PremiumToast';
+import PremiumUploadModal from '../components/PremiumUploadModal';
 
 export default function OnboardingScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
@@ -57,6 +59,7 @@ export default function OnboardingScreen({ navigation }: any) {
   const [toastVisible, setToastVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState<'success' | 'error' | 'info'>('info');
+  const [isUploading, setIsUploading] = useState(false);
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     setToastMessage(message);
@@ -78,14 +81,50 @@ export default function OnboardingScreen({ navigation }: any) {
 
 
   const pickImage = async (field: 'profilePicture' | 'aadhaarImage' | 'panImage' | 'policeVerification' | 'certification') => {
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      quality: 0.6,
-    });
-    if (!result.canceled) {
-      setForm({ ...form, [field]: result.assets[0] });
-    }
+    const isDocument = ['policeVerification', 'certification', 'aadhaarImage', 'panImage'].includes(field);
+    
+    Alert.alert(
+      'Select Source',
+      'Choose how you want to upload this document',
+      [
+        {
+          text: 'Camera',
+          onPress: async () => {
+            const result = await ImagePicker.launchCameraAsync({
+              mediaTypes: ImagePicker.MediaTypeOptions.Images,
+              allowsEditing: true,
+              quality: 0.6,
+            });
+            if (!result.canceled) setForm({ ...form, [field]: result.assets[0] });
+          }
+        },
+        {
+          text: 'Gallery',
+          onPress: async () => {
+            const result = await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ImagePicker.MediaTypeOptions.Images,
+              allowsEditing: true,
+              quality: 0.6,
+            });
+            if (!result.canceled) setForm({ ...form, [field]: result.assets[0] });
+          }
+        },
+        ...(isDocument ? [{
+          text: 'Files (PDF/Images)',
+          onPress: async () => {
+            const result = await DocumentPicker.getDocumentAsync({
+              type: ['image/*', 'application/pdf'],
+              copyToCacheDirectory: true,
+            });
+            if (!result.canceled) {
+              const file = result.assets[0];
+              setForm({ ...form, [field]: { uri: file.uri, name: file.name, type: file.mimeType } });
+            }
+          }
+        }] : []),
+        { text: 'Cancel', style: 'cancel' }
+      ]
+    );
   };
 
   const toggleCategory = (id: string) => {
@@ -122,6 +161,7 @@ export default function OnboardingScreen({ navigation }: any) {
     }
 
     setIsLoading(true);
+    setIsUploading(true);
     try {
       const formData = new FormData();
       formData.append('name', form.name);
@@ -133,10 +173,23 @@ export default function OnboardingScreen({ navigation }: any) {
 
       const appendFile = (field: string, file: any, defaultName: string) => {
         if (file) {
+          const isPdf = file.name?.toLowerCase().endsWith('.pdf') || 
+                        file.type === 'application/pdf' || 
+                        file.mimeType === 'application/pdf';
+          
+          let fileName = file.name || defaultName;
+          // Ensure correct extension for backend MIME detection
+          if (isPdf && !fileName.toLowerCase().endsWith('.pdf')) {
+            fileName = fileName.replace(/\.[^/.]+$/, "") + ".pdf";
+            if (!fileName.endsWith(".pdf")) fileName += ".pdf";
+          } else if (!isPdf && !fileName.toLowerCase().endsWith('.jpg') && !fileName.toLowerCase().endsWith('.jpeg')) {
+            fileName += '.jpg';
+          }
+
           formData.append(field, {
             uri: file.uri,
-            type: 'image/jpeg',
-            name: defaultName
+            type: isPdf ? 'application/pdf' : 'image/jpeg',
+            name: fileName
           } as any);
         }
       };
@@ -159,6 +212,7 @@ export default function OnboardingScreen({ navigation }: any) {
       showToast(err.response?.data?.message || 'Something went wrong.', 'error');
     } finally {
       setIsLoading(false);
+      setIsUploading(false);
     }
   };
 
@@ -405,6 +459,11 @@ export default function OnboardingScreen({ navigation }: any) {
         message={toastMessage} 
         type={toastType} 
         onHide={() => setToastVisible(false)} 
+      />
+
+      <PremiumUploadModal 
+        visible={isUploading} 
+        message="Securely uploading your documents to GharSeva Cloud..." 
       />
     </View>
   );

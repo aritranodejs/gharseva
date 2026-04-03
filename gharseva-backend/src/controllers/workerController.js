@@ -38,6 +38,18 @@ class WorkerController {
       if (uploadFiles['profilePicture']) {
          updates.profilePicture = `/uploads/${uploadFiles['profilePicture'][0].filename}`;
       }
+      if (uploadFiles['aadhaarImage']) {
+         updates.aadhaarImage = `/uploads/${uploadFiles['aadhaarImage'][0].filename}`;
+      }
+      if (uploadFiles['panImage']) {
+         updates.panImage = `/uploads/${uploadFiles['panImage'][0].filename}`;
+      }
+      if (uploadFiles['policeVerification']) {
+         updates.policeVerification = `/uploads/${uploadFiles['policeVerification'][0].filename}`;
+      }
+      if (uploadFiles['certification']) {
+         updates.certification = `/uploads/${uploadFiles['certification'][0].filename}`;
+      }
       const updatedWorker = await workerService.updateWorkerProfile(req.worker._id, updates);
       require('../utils/responseHelper').sendSuccess(res, updatedWorker, 'Profile updated');
     } catch (err) {

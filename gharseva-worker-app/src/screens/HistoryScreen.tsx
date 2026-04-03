@@ -105,16 +105,50 @@ export default function HistoryScreen() {
                 </View>
               )}
 
-              <View style={styles.footerRow}>
-                 <View style={styles.priceCol}>
-                    <Text style={styles.footerLabel}>Total Price</Text>
-                    <Text style={styles.footerValue}>₹{job.price}</Text>
+              <View style={styles.earningsBreakdown}>
+                 <View style={styles.earningRow}>
+                    <Text style={styles.earningLabel}>Customer Paid</Text>
+                    <Text style={styles.earningValue}>₹{job.totalAmount || job.price + (job.platformFee || 29)}</Text>
                  </View>
-                 <View style={styles.earningsCol}>
-                    <Text style={styles.footerLabel}>Earnings</Text>
-                    <Text style={[styles.footerValue, { color: '#059669' }]}>₹{job.workerEarnings || 0}</Text>
+                 <View style={styles.earningRow}>
+                    <Text style={styles.earningSubLabel}>- Platform Fee (Customer)</Text>
+                    <Text style={styles.earningSubValue}>₹{job.platformFee || 29}</Text>
+                 </View>
+                 <View style={[styles.earningRow, { marginTop: 4, paddingTop: 4, borderTopWidth: 1, borderTopColor: '#F3F4F6' }]}>
+                    <Text style={styles.earningLabel}>Service Value</Text>
+                    <Text style={styles.earningValue}>₹{job.price}</Text>
+                 </View>
+                 <View style={[styles.earningRow, { marginTop: 8, padding: 8, backgroundColor: '#F0FDF4', borderRadius: 8 }]}>
+                    <Text style={[styles.earningLabel, { color: '#065F46' }]}>YOUR NET EARNINGS</Text>
+                    <Text style={[styles.earningValue, { color: '#059669', fontSize: 18 }]}>₹{job.workerEarnings || job.price}</Text>
                  </View>
               </View>
+
+              {/* Service Photos Evidence */}
+              {((job.beforeServiceImages?.length || 0) > 0 || (job.afterServiceImages?.length || 0) > 0) && (
+                <View style={styles.evidenceSection}>
+                  {job.beforeServiceImages?.length > 0 && (
+                    <View style={styles.evidenceContainer}>
+                      <Text style={styles.evidenceTitle}>Before Service</Text>
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.evidenceScroll}>
+                        {job.beforeServiceImages.map((img: string, i: number) => (
+                          <Image key={i} source={{ uri: getImageUrl(img) || '' }} style={styles.evidenceImage} />
+                        ))}
+                      </ScrollView>
+                    </View>
+                  )}
+                  {job.afterServiceImages?.length > 0 && (
+                    <View style={[styles.evidenceContainer, { marginTop: 12 }]}>
+                      <Text style={styles.evidenceTitle}>After Service</Text>
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.evidenceScroll}>
+                        {job.afterServiceImages.map((img: string, i: number) => (
+                          <Image key={i} source={{ uri: getImageUrl(img) || '' }} style={styles.evidenceImage} />
+                        ))}
+                      </ScrollView>
+                    </View>
+                  )}
+                </View>
+              )}
 
               {/* Job Timeline */}
               <View style={styles.timelineContainer}>
@@ -198,5 +232,20 @@ const styles = StyleSheet.create({
   timelineItem: { flexDirection: 'row', alignItems: 'center', marginBottom: 8, paddingLeft: 4 },
   timelineDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#E5E7EB', marginRight: 12 },
   timelineLine: { position: 'absolute', left: 7.5, top: 14, bottom: -4, width: 1, backgroundColor: '#E5E7EB' },
-  timelineText: { fontSize: 13, color: '#4B5563', fontWeight: '600' }
+  timelineText: { fontSize: 13, color: '#4B5563', fontWeight: '600' },
+
+  // New Transparency Styles
+  earningsBreakdown: { marginTop: 16, padding: 12, backgroundColor: '#FAFAFA', borderRadius: 16, borderWidth: 1, borderColor: '#F1F5F9' },
+  earningRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  earningLabel: { fontSize: 13, fontWeight: '900', color: '#1E1B4B' },
+  earningValue: { fontSize: 14, fontWeight: '900', color: '#1E1B4B' },
+  earningSubLabel: { fontSize: 11, color: '#64748B', fontWeight: '700' },
+  earningSubValue: { fontSize: 11, color: '#64748B', fontWeight: '800' },
+  
+  // Evidence Styles
+  evidenceSection: { marginTop: 20, paddingTop: 16, borderTopWidth: 1, borderTopColor: '#F3F4F6' },
+  evidenceContainer: { },
+  evidenceTitle: { fontSize: 11, fontWeight: '900', color: '#1E1B4B', textTransform: 'uppercase', marginBottom: 10, letterSpacing: 0.5 },
+  evidenceScroll: { gap: 10 },
+  evidenceImage: { width: 70, height: 70, borderRadius: 10, backgroundColor: '#F3F4F6' }
 });

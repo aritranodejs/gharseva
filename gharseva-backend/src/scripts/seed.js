@@ -8,6 +8,8 @@ const seedFAQs = require('./seeders/faqSeeder');
 const seedWorkers = require('./seeders/workerSeeder');
 const seedPackages = require('./seeders/packageSeeder');
 const seedNotifications = require('./seeders/notificationSeeder');
+const seedAreas = require('./seeders/areaSeeder');
+const seedPremium = require('./seeders/premiumSeeder');
 
 const runSeeders = async () => {
   try {
@@ -31,6 +33,12 @@ const runSeeders = async () => {
     
     console.log('Seeding Notifications...');
     await seedNotifications();
+
+    console.log('Seeding Serviceable Areas...');
+    await seedAreas();
+
+    console.log('Seeding Premium Lifestyle Packages...');
+    await seedPremium();
 
     console.log('--- All Seeders Completed Successfully ---');
     process.exit(0);

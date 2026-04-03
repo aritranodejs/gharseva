@@ -28,11 +28,12 @@ class BookingRepository {
       .populate('userId', 'name profilePicture phoneNumber');
   }
 
-  async updateStatus(id, status, workerId) {
+  async updateStatus(id, status, workerId, additionalUpdates = {}) {
     // Standard update: requires workerId match for security
+    const update = { status, ...additionalUpdates };
     return await Booking.findOneAndUpdate(
       { _id: id, assignedWorkerId: workerId },
-      { status },
+      update,
       { new: true }
     );
   }

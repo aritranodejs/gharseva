@@ -38,7 +38,13 @@ router.get('/profile', protectWorker, workerController.getProfile);
  * @desc    Update authenticated worker profile
  * @access  Private (Worker)
  */
-router.put('/profile', protectWorker, upload.fields([{ name: 'profilePicture', maxCount: 1 }]), workerController.updateProfile);
+router.put('/profile', protectWorker, upload.fields([
+  { name: 'profilePicture', maxCount: 1 },
+  { name: 'aadhaarImage', maxCount: 1 },
+  { name: 'panImage', maxCount: 1 },
+  { name: 'policeVerification', maxCount: 1 },
+  { name: 'certification', maxCount: 1 }
+]), workerController.updateProfile);
 
 /**
  * @route   GET /api/workers/bookings
@@ -66,7 +72,10 @@ router.post('/bookings/:id/accept', protectWorker, bookingController.acceptBooki
  * @desc    Worker updates job status (in_progress or completed)
  * @access  Private (Worker)
  */
-router.post('/bookings/:id/status', protectWorker, bookingController.updateStatus);
+router.post('/bookings/:id/status', protectWorker, upload.fields([
+  { name: 'beforeServiceImages', maxCount: 5 },
+  { name: 'afterServiceImages', maxCount: 5 }
+]), bookingController.updateStatus);
 
 /**
  * @route   POST /api/workers/online
