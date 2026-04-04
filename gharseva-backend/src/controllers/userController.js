@@ -2,6 +2,7 @@ const userService = require('../services/userService');
 const smsService = require('../services/smsService');
 const { sendSuccess, sendError } = require('../utils/responseHelper');
 const tokenStore = require('../utils/tokenStore');
+const { uploadFileBuffer } = require('../services/imageUpload');
 
 class UserController {
   async sendOtp(req, res) {
@@ -44,7 +45,8 @@ class UserController {
       const uploadFiles = req.files || {};
       const updates = { ...req.body };
       if (uploadFiles && uploadFiles['profilePicture'] && uploadFiles['profilePicture'].length > 0) {
-        updates.profilePicture = `/uploads/profilePicture/${uploadFiles['profilePicture'][0].filename}`;
+        // Upload to standardized /uploads path
+        updates.profilePicture = await uploadFileBuffer(uploadFiles['profilePicture'][0], '/uploads/profilePicture');
       }
       const user = await userService.updateProfile(req.user.id, updates);
       sendSuccess(res, user, 'Profile updated successfully');

@@ -19,43 +19,40 @@ if (IMAGEKIT_ENABLED) {
 }
 
 /**
- * Upload a base64 encoded image.
- * - If IMAGEKIT_ENABLED=true  → uploads to ImageKit CDN, returns public URL
- * - If IMAGEKIT_ENABLED=false → saves to /uploads/ folder, returns local URL
+ * Upload a multer file buffer to ImageKit or save locally.
+ * Returns only the relative path (e.g., /uploads/profilePicture/123.jpg).
  *
- * @param {string} base64Data - Full base64 string (with or without data URI prefix)
- * @param {string} fileName   - Desired filename (without extension)
- * @returns {Promise<string>}  - Public image URL
+ * @param {Object} multerFile  - Multer file object with .buffer, .originalname
+ * @param {string} folder      - Destination folder path (must start with /uploads)
+ * @returns {Promise<string>}  - The saved image path (to be stored in DB)
  */
-const uploadImage = async (base64Data, fileName) => {
-  // Strip the data URI prefix if present (e.g., "data:image/jpeg;base64,...")
-  const base64Clean = base64Data.includes(',') ? base64Data.split(',')[1] : base64Data;
-  const mimeMatch = base64Data.match(/data:([^;]+);base64,/);
-  const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
-  const ext = mimeType.split('/')[1] || 'jpg';
-
+const uploadFileBuffer = async (multerFile, folder = '/uploads/others') => {
   if (IMAGEKIT_ENABLED && imagekit) {
     // --- Upload to ImageKit ---
     const response = await imagekit.upload({
-      file: base64Clean,
-      fileName: `${fileName}_${Date.now()}.${ext}`,
-      folder: '/gharseva/profiles',
+      file: multerFile.buffer.toString('base64'),
+      fileName: `${Date.now()}_${multerFile.originalname}`,
+      folder: folder,
       useUniqueFileName: true,
     });
-    return response.url;
+    // Return only the filePath (e.g. /uploads/profilePicture/123.jpg)
+    return response.filePath;
   } else {
     // --- Save locally to /uploads ---
-    const uploadsDir = path.join(__dirname, '../../uploads/profiles');
-    if (!fs.existsSync(uploadsDir)) {
-      fs.mkdirSync(uploadsDir, { recursive: true });
+    const uploadsBaseDir = path.join(__dirname, '../../'); // Project root
+    const targetDir = path.join(uploadsBaseDir, folder);
+    
+    if (!fs.existsSync(targetDir)) {
+      fs.mkdirSync(targetDir, { recursive: true });
     }
 
-    const localFileName = `${fileName}_${Date.now()}.${ext}`;
-    const filePath = path.join(uploadsDir, localFileName);
-    fs.writeFileSync(filePath, Buffer.from(base64Clean, 'base64'));
+    const localFileName = `${Date.now()}_${multerFile.originalname}`;
+    const filePath = path.join(targetDir, localFileName);
+    fs.writeFileSync(filePath, multerFile.buffer);
 
-    return `/uploads/profiles/${localFileName}`;
+    // Return the relative path (consistent with ImageKit filePath)
+    return `${folder}/${localFileName}`;
   }
 };
 
-module.exports = { uploadImage, IMAGEKIT_ENABLED };
+module.exports = { uploadFileBuffer, IMAGEKIT_ENABLED };

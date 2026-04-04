@@ -1,13 +1,33 @@
 const workerService = require('../services/workerService');
 const Worker = require('../models/Worker');
 const { sendSuccess, sendError } = require('../utils/responseHelper');
+const { uploadFileBuffer } = require('../services/imageUpload');
 
 class WorkerController {
   async register(req, res) {
     try {
       const uploadFiles = req.files || {};
-      const profilePicUrl = uploadFiles['profilePicture'] ? `/uploads/profilePicture/${uploadFiles['profilePicture'][0].filename}` : '';
-      
+
+      // Standardize storage paths to start with /uploads for both local and ImageKit
+      const profilePicUrl = uploadFiles['profilePicture']
+        ? await uploadFileBuffer(uploadFiles['profilePicture'][0], '/uploads/profilePicture')
+        : '';
+      const aadhaarUrl = uploadFiles['aadhaarImage']
+        ? await uploadFileBuffer(uploadFiles['aadhaarImage'][0], '/uploads/aadhaarImage')
+        : '';
+      const panUrl = uploadFiles['panImage']
+        ? await uploadFileBuffer(uploadFiles['panImage'][0], '/uploads/panImage')
+        : '';
+      const policeUrl = uploadFiles['policeVerification']
+        ? await uploadFileBuffer(uploadFiles['policeVerification'][0], '/uploads/policeVerification')
+        : '';
+      const certUrl = uploadFiles['certification']
+        ? await uploadFileBuffer(uploadFiles['certification'][0], '/uploads/certification')
+        : '';
+      const docUrls = uploadFiles['documents']
+        ? await Promise.all(uploadFiles['documents'].map(d => uploadFileBuffer(d, '/uploads/documents')))
+        : [];
+
       const workerData = {
         name: req.body.name,
         phoneNumber: req.body.phoneNumber,
@@ -18,11 +38,11 @@ class WorkerController {
         profilePicture: profilePicUrl,
         aadhaarNumber: req.body.aadhaarNumber,
         panNumber: req.body.panNumber,
-        aadhaarImage: uploadFiles['aadhaarImage'] ? `/uploads/aadhaarImage/${uploadFiles['aadhaarImage'][0].filename}` : '',
-        panImage: uploadFiles['panImage'] ? `/uploads/panImage/${uploadFiles['panImage'][0].filename}` : '',
-        policeVerification: uploadFiles['policeVerification'] ? `/uploads/policeVerification/${uploadFiles['policeVerification'][0].filename}` : '',
-        certification: uploadFiles['certification'] ? `/uploads/certification/${uploadFiles['certification'][0].filename}` : '',
-        documents: uploadFiles['documents'] ? uploadFiles['documents'].map(d => `/uploads/documents/${d.filename}`) : []
+        aadhaarImage: aadhaarUrl,
+        panImage: panUrl,
+        policeVerification: policeUrl,
+        certification: certUrl,
+        documents: docUrls
       };
 
       const newWorker = await workerService.registerWorker(workerData);
@@ -36,21 +56,23 @@ class WorkerController {
     try {
       const uploadFiles = req.files || {};
       const updates = { ...req.body };
+      
       if (uploadFiles['profilePicture']) {
-         updates.profilePicture = `/uploads/profilePicture/${uploadFiles['profilePicture'][0].filename}`;
+         updates.profilePicture = await uploadFileBuffer(uploadFiles['profilePicture'][0], '/uploads/profilePicture');
       }
       if (uploadFiles['aadhaarImage']) {
-         updates.aadhaarImage = `/uploads/aadhaarImage/${uploadFiles['aadhaarImage'][0].filename}`;
+         updates.aadhaarImage = await uploadFileBuffer(uploadFiles['aadhaarImage'][0], '/uploads/aadhaarImage');
       }
       if (uploadFiles['panImage']) {
-         updates.panImage = `/uploads/panImage/${uploadFiles['panImage'][0].filename}`;
+         updates.panImage = await uploadFileBuffer(uploadFiles['panImage'][0], '/uploads/panImage');
       }
       if (uploadFiles['policeVerification']) {
-         updates.policeVerification = `/uploads/policeVerification/${uploadFiles['policeVerification'][0].filename}`;
+         updates.policeVerification = await uploadFileBuffer(uploadFiles['policeVerification'][0], '/uploads/policeVerification');
       }
       if (uploadFiles['certification']) {
-         updates.certification = `/uploads/certification/${uploadFiles['certification'][0].filename}`;
+         updates.certification = await uploadFileBuffer(uploadFiles['certification'][0], '/uploads/certification');
       }
+      
       const updatedWorker = await workerService.updateWorkerProfile(req.worker._id, updates);
       sendSuccess(res, updatedWorker, 'Profile updated');
     } catch (err) {

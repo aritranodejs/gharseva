@@ -48,13 +48,7 @@ class UserService {
     if (updateData.addresses) user.addresses = updateData.addresses;
 
     if (updateData.profilePicture) {
-      const pic = updateData.profilePicture;
-      if (pic.startsWith('data:image') || pic.length > 500) {
-        const imageUrl = await uploadImage(pic, `profile_${id}`);
-        user.profilePicture = imageUrl;
-      } else {
-        user.profilePicture = pic;
-      }
+      user.profilePicture = updateData.profilePicture;
     }
 
     return await user.save();
