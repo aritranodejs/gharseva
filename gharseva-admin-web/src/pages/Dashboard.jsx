@@ -69,12 +69,13 @@ const Dashboard = () => {
   };
 
   const getTimeLabel = (id) => {
+    if (!id) return 'Unknown';
     if (timeRange === 'day') return `${id}:00`;
     if (timeRange === 'year') {
       const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      return months[id - 1];
+      return months[Number(id) - 1] || id;
     }
-    return id.split('-').slice(1).join('/');
+    return String(id).includes('-') ? String(id).split('-').slice(1).join('/') : String(id);
   };
 
   const chartData = stats.chartData?.map(d => ({
@@ -272,6 +273,16 @@ const Dashboard = () => {
                   Variable %
                 </button>
               </div>
+            </div>
+
+            <div className="form-group">
+              <label>{settings.platformFeeType === 'fixed' ? 'Fixed Amount per Booking (₹)' : 'Variable Fee Percentage (%)'}</label>
+              <input
+                type="number"
+                value={settings.platformFeeValue || 0}
+                onChange={(e) => setSettings({ ...settings, platformFeeValue: Number(e.target.value) })}
+                className="fee-input"
+              />
             </div>
 
             <div className="form-group" style={{ marginTop: '24px' }}>
