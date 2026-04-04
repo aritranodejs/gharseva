@@ -5,7 +5,7 @@ import api from '../services/api';
 import './Login.css';
 
 const Login = () => {
-  const [phoneNumber, setPhoneNumber] = useState('9999999999');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [otp, setOtp] = useState('');
   const [otpSent, setOtpSent] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -67,7 +67,7 @@ const Login = () => {
                 type="tel" 
                 value={phoneNumber} 
                 onChange={(e) => setPhoneNumber(e.target.value)}
-                placeholder="9999999999"
+                placeholder="9874532145"
                 required
                 disabled={otpSent}
               />
