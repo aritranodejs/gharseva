@@ -12,7 +12,7 @@ const app = express();
 
 // Middleware
 app.use(cors({
-  origin: '*',
+  origin: ["http://localhost:3000", "http://localhost:5173", "https://gharseva-gamma.vercel.app"],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
   credentials: true
@@ -63,7 +63,7 @@ const server = http.createServer(app);
 
 // Attach Socket.io for real-time dispatch
 const io = new Server(server, {
-  cors: { origin: '*', methods: ['GET', 'POST'] }
+  cors: { origin: ["http://localhost:3000", "http://localhost:5173", "https://gharseva-gamma.vercel.app"], methods: ['GET', 'POST'] }
 });
 
 // Make io accessible from anywhere in the app
@@ -92,14 +92,14 @@ io.on('connection', (socket) => {
         { _id: data.workerId },
         { location: { type: 'Point', coordinates: [data.lng, data.lat] }, isOnline: true }
       );
-    } catch(err) { /* silent */ }
+    } catch (err) { /* silent */ }
   });
 
   socket.on('worker_offline', async (workerId) => {
     const Worker = require('./models/Worker');
     try {
       await Worker.findByIdAndUpdate(workerId, { isOnline: false });
-    } catch(err) { /* silent */ }
+    } catch (err) { /* silent */ }
   });
 
   socket.on('disconnect', () => {
