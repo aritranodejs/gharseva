@@ -38,6 +38,7 @@
     },
     "android": {
       "package": "com.gharseva.worker",
+      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
