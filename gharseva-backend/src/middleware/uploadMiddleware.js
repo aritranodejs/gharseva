@@ -3,19 +3,32 @@ const path = require('path');
 const fs = require('fs');
 
 const uploadDir = path.join(__dirname, '../../uploads');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
+try {
+  if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+  }
+} catch (err) {
+  // Vercel has a read-only filesystem — skip directory creation
+  console.warn('[Upload] Could not create uploads directory (read-only filesystem). Using /tmp fallback.');
 }
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     // Determine subdirectory based on fieldname (or fallback to 'others')
     const subDirName = file.fieldname ? file.fieldname : 'others';
-    const dynamicDir = path.join(uploadDir, subDirName);
+    let dynamicDir = path.join(uploadDir, subDirName);
     
-    // Ensure the subdirectory exists
-    if (!fs.existsSync(dynamicDir)) {
-      fs.mkdirSync(dynamicDir, { recursive: true });
+    try {
+      // Ensure the subdirectory exists
+      if (!fs.existsSync(dynamicDir)) {
+        fs.mkdirSync(dynamicDir, { recursive: true });
+      }
+    } catch (err) {
+      // Vercel read-only filesystem — fallback to /tmp
+      dynamicDir = path.join('/tmp', 'uploads', subDirName);
+      if (!fs.existsSync(dynamicDir)) {
+        fs.mkdirSync(dynamicDir, { recursive: true });
+      }
     }
     
     cb(null, dynamicDir);
