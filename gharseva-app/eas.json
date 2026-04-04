@@ -1,12 +1,4 @@
 {
-  "cli": {
-    "version": ">= 12.0.0",
-    "appExtensions": {
-      "gharseva-app": {
-        "projectId": "85f6799b-640a-4298-967a-1158913693fb"
-      }
-    }
-  },
   "build": {
     "development": {
       "developmentClient": true,
@@ -18,9 +10,7 @@
         "buildType": "apk"
       }
     },
-    "production": {
-      "autoIncrement": true
-    }
+    "production": {}
   },
   "submit": {
     "production": {}

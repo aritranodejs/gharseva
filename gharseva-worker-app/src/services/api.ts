@@ -6,10 +6,13 @@ import { Platform } from 'react-native';
 // We prioritize the environment variable if set by Expo
 const getBaseURL = () => {
   const envUrl = process.env.EXPO_PUBLIC_API_URL;
+  if (envUrl) return envUrl;
+  
   // Generic fallback for local development if .env is missing. 
   // Custom: using your dev IP 192.168.1.6
   return 'http://192.168.1.6:5000/api/';
 };
+
 
 export const API_URL = getBaseURL();
 export const API_URL_NO_SLASH = API_URL.endsWith('/') ? API_URL.slice(0, -1) : API_URL;

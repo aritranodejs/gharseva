@@ -228,25 +228,58 @@ const Dashboard = () => {
             {loading ? (
               <div className="loading-chart h-[300px] flex items-center justify-center text-xs text-slate-300 font-bold tracking-widest animate-pulse">SYNCHRONIZING BUSINESS DATA...</div>
             ) : (
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#818CF8" stopOpacity={1} />
-                      <stop offset="100%" stopColor="#4F46E5" stopOpacity={1} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 700 }} dy={10} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 700 }} dx={-10} tickFormatter={(val) => `₹${val}`} />
-                  <Tooltip 
-                    cursor={{fill: '#f8fafc', radius: 4}}
-                    contentStyle={{ borderRadius: '14px', border: 'none', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', padding: '16px', fontWeight: 'bold', fontSize: '12px' }}
-                    formatter={(value) => [`₹${value.toLocaleString()}`, 'Platform Revenue']}
-                  />
-                  <Bar dataKey="revenue" fill="url(#barGradient)" radius={[6, 6, 0, 0]} maxBarSize={36} animationDuration={1500} />
-                </BarChart>
-              </ResponsiveContainer>
+                  <ResponsiveContainer width="100%" height={320}>
+                    <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#6366F1" stopOpacity={0.3} />
+                          <stop offset="95%" stopColor="#6366F1" stopOpacity={0} />
+                        </linearGradient>
+                        <linearGradient id="lineGradient" x1="0" y1="0" x2="1" y2="0">
+                          <stop offset="0%" stopColor="#4F46E5" />
+                          <stop offset="100%" stopColor="#A855F7" />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                      <XAxis 
+                        dataKey="name" 
+                        axisLine={false} 
+                        tickLine={false} 
+                        tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 800 }} 
+                        dy={15} 
+                      />
+                      <YAxis 
+                        axisLine={false} 
+                        tickLine={false} 
+                        tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 800 }} 
+                        dx={-10} 
+                        tickFormatter={(val) => `₹${val}`} 
+                      />
+                      <Tooltip 
+                        cursor={{ stroke: '#6366F1', strokeWidth: 2, strokeDasharray: '5 5' }}
+                        contentStyle={{ 
+                          borderRadius: '20px', 
+                          border: 'none', 
+                          boxShadow: '0 25px 50px -12px rgba(0,0,0,0.15)', 
+                          padding: '20px', 
+                          fontWeight: '900', 
+                          fontSize: '12px',
+                          background: 'rgba(255, 255, 255, 0.95)',
+                          backdropFilter: 'blur(10px)'
+                        }}
+                        formatter={(value) => [`₹${value.toLocaleString()}`, 'Net Velocity']}
+                      />
+                      <Area 
+                        type="monotone" 
+                        dataKey="revenue" 
+                        stroke="url(#lineGradient)" 
+                        strokeWidth={4}
+                        fillOpacity={1} 
+                        fill="url(#areaGradient)" 
+                        animationDuration={2000}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
             )}
           </div>
         </div>
