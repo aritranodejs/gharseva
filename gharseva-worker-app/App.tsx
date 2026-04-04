@@ -17,6 +17,7 @@ import ProfileScreen from './src/screens/ProfileScreen';
 import PrivacyScreen from './src/screens/PrivacyScreen';
 import HelpScreen from './src/screens/HelpScreen';
 import JobDetailScreen from './src/screens/JobDetailScreen';
+import EarningsScreen from './src/screens/EarningsScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -113,6 +114,7 @@ export default function App() {
             <Stack.Screen name="Privacy" component={PrivacyScreen} />
             <Stack.Screen name="Help" component={HelpScreen} />
             <Stack.Screen name="JobDetail" component={JobDetailScreen} />
+            <Stack.Screen name="Earnings" component={EarningsScreen} />
           </>
         )}
       </Stack.Navigator>

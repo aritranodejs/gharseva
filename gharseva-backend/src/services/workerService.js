@@ -95,10 +95,13 @@ class WorkerService {
     return await workerRepository.updateLocation(id, coordinates);
   }
 
-  async getWorkerEarnings(workerId, range, specificYear) {
+  async getWorkerEarnings(workerId, range = 'week', specificYear) {
+    const mongoose = require('mongoose');
     const Booking = require('../models/Booking');
+    
     let startDate;
     let endDate;
+    let groupBy;
 
     const now = new Date();
 
@@ -106,39 +109,62 @@ class WorkerService {
       const targetYear = parseInt(specificYear);
       startDate = new Date(targetYear, 0, 1);
       endDate = new Date(targetYear + 1, 0, 1);
+      groupBy = { $dateToString: { format: "%Y-%m", date: "$completedAt" } };
     } else {
       if (range === 'day') {
         startDate = new Date(new Date().setHours(0, 0, 0, 0));
+        groupBy = { $hour: "$completedAt" };
       } else if (range === 'week') {
         startDate = new Date(new Date().setDate(now.getDate() - 7));
+        groupBy = { $dateToString: { format: "%Y-%m-%d", date: "$completedAt" } };
       } else if (range === 'month') {
         startDate = new Date(new Date().setMonth(now.getMonth() - 1));
-      } else if (range === 'year') {
-        startDate = new Date(new Date().setFullYear(now.getFullYear() - 1));
+        groupBy = { $dateToString: { format: "%Y-%m-%d", date: "$completedAt" } };
       } else {
-        startDate = new Date(0); // All time
+        startDate = new Date(new Date().setFullYear(now.getFullYear() - 1));
+        groupBy = { $dateToString: { format: "%Y-%m", date: "$completedAt" } };
       }
     }
 
-    const dateMatch = {
-      assignedWorkerId: workerId,
+    const matchQuery = {
+      assignedWorkerId: new mongoose.Types.ObjectId(workerId),
       status: 'completed',
-      ...(startDate && {
-        $or: [
-          { completedAt: { $gte: startDate, ...(endDate ? { $lt: endDate } : {}) } },
-          { updatedAt: { $gte: startDate, ...(endDate ? { $lt: endDate } : {}) } }
-        ]
-      })
+      completedAt: { $gte: startDate, ...(endDate ? { $lt: endDate } : {}) }
     };
 
-    const bookings = await Booking.find(dateMatch).populate('serviceId', 'name').sort({ updatedAt: -1 });
+    const earningsData = await Booking.aggregate([
+      { $match: matchQuery },
+      {
+        $group: {
+          _id: groupBy,
+          earnings: { $sum: "$workerEarnings" },
+          volume: { $sum: 1 }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ]);
 
-    const totalEarnings = bookings.reduce((sum, b) => sum + (b.workerEarnings || b.price || 0), 0);
+    const stats = await Booking.aggregate([
+      { $match: matchQuery },
+      {
+        $group: {
+          _id: null,
+          totalEarnings: { $sum: "$workerEarnings" },
+          totalJobs: { $sum: 1 }
+        }
+      }
+    ]);
+
+    const recentBookings = await Booking.find(matchQuery)
+      .populate('serviceId', 'name')
+      .sort({ completedAt: -1 })
+      .limit(10);
 
     return {
-      totalEarnings,
-      completedJobs: bookings.length,
-      bookings: bookings.map(b => ({
+      chartData: earningsData,
+      totalEarnings: stats[0]?.totalEarnings || 0,
+      totalJobs: stats[0]?.totalJobs || 0,
+      recentBookings: recentBookings.map(b => ({
         bookingId: b.bookingId || b._id.toString().slice(-6),
         serviceName: b.serviceId?.name || 'Home Service',
         amount: b.workerEarnings || b.price,

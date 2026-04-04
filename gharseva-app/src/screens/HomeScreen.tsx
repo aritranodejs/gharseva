@@ -540,9 +540,9 @@ export default function HomeScreen() {
              </View>
            </View>
            <View style={{ flex: 1 }} />
-           <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, borderWidth: 1, borderColor: '#F1F5F9' }}>
-              <Clock size={12} color="#4F46E5" style={{ marginRight: 4 }} />
-              <Text style={{ fontSize: 11, fontWeight: '800', color: '#4F46E5', fontVariant: ['tabular-nums'] }}>
+           <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#0F172A', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 14, borderWidth: 1.5, borderColor: '#FBBF24', shadowColor: '#FBBF24', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 5 }}>
+              <Clock size={12} color="#FBBF24" style={{ marginRight: 6 }} />
+              <Text style={{ fontSize: 13, fontWeight: '900', color: '#FBBF24', fontVariant: ['tabular-nums'], letterSpacing: 0.5 }}>
                 {currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
               </Text>
            </View>

@@ -41,8 +41,8 @@ class AdminController {
 
   async getAllBookings(req, res) {
     try {
-      const { status, pincode } = req.query;
-      const bookings = await adminService.getAllBookings(status, pincode);
+      const { status, pincode, specificYear } = req.query;
+      const bookings = await adminService.getAllBookings(status, pincode, specificYear);
       sendSuccess(res, bookings);
     } catch (err) {
       sendError(res, err.message);

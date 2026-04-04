@@ -30,14 +30,6 @@ class AdminService {
       }
     }
 
-    const [totalBookings, completedBookings, recentBookings, activeWorkers, usersCount] = await Promise.all([
-      adminRepository.countBookings(),
-      adminRepository.countBookings({ status: 'completed' }),
-      adminRepository.getRecentBookings(5),
-      adminRepository.countWorkers({ status: 'approved' }),
-      adminRepository.countUsers({ role: 'user' })
-    ]);
-
     const dateMatch = {
       status: 'completed',
       $or: [
@@ -45,6 +37,25 @@ class AdminService {
         { updatedAt: { $gte: startDate, ...(endDate ? { $lt: endDate } : {}) } }
       ]
     };
+
+    const rangeMatch = {
+      createdAt: { $gte: startDate, ...(endDate ? { $lt: endDate } : {}) }
+    };
+
+
+    const [totalBookings, completedBookings, activeWorkers, usersCount] = await Promise.all([
+      adminRepository.countBookings(rangeMatch),
+      adminRepository.countBookings({ ...dateMatch }),
+      adminRepository.countWorkers({ status: 'approved' }),
+      adminRepository.countUsers({ role: 'user' })
+    ]);
+
+    const recentBookings = await adminRepository.findBookings(
+      { ...rangeMatch }, 
+      [{ path: 'userId', select: 'name' }, { path: 'serviceId', select: 'name' }]
+    );
+    // Limit to 5 most recent for the dashboard
+    const limitedRecent = recentBookings.sort((a, b) => b.createdAt - a.createdAt).slice(0, 5);
 
     const rangeBookings = await adminRepository.findBookings(dateMatch, []);
 
@@ -73,7 +84,7 @@ class AdminService {
 
     const chartData = await adminRepository.aggregateBookings(pipeline);
 
-    // Distribution Data for Pie Chart
+    // Distribution Data for Pie Chart (Revenue by Service)
     const piePipeline = [
       { $match: dateMatch },
       {
@@ -85,15 +96,18 @@ class AdminService {
       },
       {
         $lookup: {
-          from: 'services',
+          from: 'services', // Standard pluralized collection name
           localField: '_id',
           foreignField: '_id',
           as: 'serviceInfo'
         }
       },
       {
+        $unwind: { path: "$serviceInfo", preserveNullAndEmptyArrays: true }
+      },
+      {
         $project: {
-          name: { $arrayElemAt: ["$serviceInfo.name", 0] },
+          name: { $ifNull: ["$serviceInfo.name", "Uncategorized"] },
           revenue: 1,
           count: 1
         }
@@ -103,14 +117,14 @@ class AdminService {
     const serviceDistribution = await adminRepository.aggregateBookings(piePipeline);
 
     return {
-      totalBookings,
-      completedBookings,
+      totalBookings, // Now scoped to range
+      completedBookings, // Now scoped to range
       activeWorkers,
       usersCount,
       totalRevenue,
       platformProfit,
       workerPayouts,
-      recentBookings,
+      recentBookings: limitedRecent,
       chartData,
       serviceDistribution
     };
@@ -136,10 +150,18 @@ class AdminService {
     ]);
   }
 
-  async getAllBookings(status, pincode) {
+  async getAllBookings(status, pincode, specificYear) {
     const query = {};
     if (status) query.status = status;
     if (pincode) query.pincode = pincode;
+    
+    if (specificYear && specificYear !== 'all') {
+      const targetYear = parseInt(specificYear);
+      const startDate = new Date(targetYear, 0, 1);
+      const endDate = new Date(targetYear + 1, 0, 1);
+      query.createdAt = { $gte: startDate, $lt: endDate };
+    }
+
     return await adminRepository.getAllBookingsSorted(query);
   }
 

@@ -11,19 +11,16 @@ const Bookings = () => {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-
-  const [selectedBooking, setSelectedBooking] = useState(null);
-  const [detailsModalOpen, setDetailsModalOpen] = useState(false);
-  const [previewImage, setPreviewImage] = useState(null);
+  const [selectedYear, setSelectedYear] = useState('all');
 
   useEffect(() => {
     fetchBookings();
-  }, []);
+  }, [selectedYear]);
 
   const fetchBookings = async () => {
+    setLoading(true);
     try {
-      const res = await api.get('admin/bookings');
+      const res = await api.get(`admin/bookings?specificYear=${selectedYear}`);
       setBookings(res.data.data);
     } catch (err) {
       console.error('Error fetching bookings:', err);
@@ -153,7 +150,21 @@ const Bookings = () => {
           <h1>Global Bookings</h1>
           <p>Real-time oversight of all platform jobs and service fulfillment.</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex items-center gap-3">
+          <div className="time-pivot-bar">
+             {['all', ...Array.from({ length: Math.max(1, new Date().getFullYear() - 2024) }, (_, i) => (2025 + i).toString())].map(y => (
+               <button 
+                 key={y} 
+                 className={`pivot-btn ${selectedYear === y ? 'active' : ''}`}
+                 onClick={() => setSelectedYear(y)}
+               >
+                 {y === 'all' ? 'ALL' : y}
+               </button>
+             ))}
+          </div>
+          <button className="btn-outline px-3" onClick={fetchBookings} title="Sync Transactions">
+            <Clock size={18} />
+          </button>
           <button className="btn-outline" onClick={exportToExcel} disabled={loading}>
             <Download size={18} className="mr-1" /> Excel
           </button>
@@ -288,8 +299,8 @@ const Bookings = () => {
         onClose={() => setDetailsModalOpen(false)}
         title={`Oversight: ${selectedBooking?.bookingId || selectedBooking?._id.slice(-8).toUpperCase()}`}
         footer={
-          <div className="flex justify-between w-full">
-            <button className="btn-outline" onClick={() => {
+          <div className="modal-footer-premium">
+            <button className="btn-outline-indigo" onClick={() => {
               const doc = new jsPDF();
               doc.setFontSize(22); doc.setTextColor(79, 70, 229); doc.text('GharSeva Receipt', 14, 20);
               doc.setFontSize(10); doc.setTextColor(100); doc.text(`Platform Ledger: ${selectedBooking.bookingId}`, 14, 28);
@@ -311,9 +322,10 @@ const Bookings = () => {
               });
               doc.save(`GharSeva_Receipt_${selectedBooking.bookingId}.pdf`);
             }}>
-              <Download size={16} className="mr-1" /> Download Receipt
+              <Download size={16} className="mr-2" /> Download Receipt
             </button>
-            <button className="btn-primary" onClick={() => setDetailsModalOpen(false)}>Close Oversight</button>
+            <div className="flex-1" />
+            <button className="btn-primary-indigo" onClick={() => setDetailsModalOpen(false)}>Close Oversight</button>
           </div>
         }
       >

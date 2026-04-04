@@ -93,10 +93,11 @@ const Dashboard = () => {
 
   const pieData = stats.serviceDistribution?.map(d => ({
     name: d.name,
-    value: d.revenue
-  })) || [];
+    value: d.revenue || (d.count ? 0.01 : 0), // Fallback to tiny value to show slice if revenue is 0 but count exists
+    count: d.count
+  })).filter(d => d.value > 0 || d.count > 0) || [];
 
-  const COLORS = ['#6366F1', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#06B6D4'];
+  const COLORS = ['#FBBF24', '#10B981', '#3B82F6', '#8B5CF6', '#EC4899', '#06B6D4'];
 
   const handleExportExcel = () => {
     try {
@@ -123,14 +124,19 @@ const Dashboard = () => {
     <div className="dashboard-page">
       <div className="page-header">
         <div>
-          <div className="flex items-center gap-3 mb-1">
+          <div className="flex items-center gap-4 mb-2">
              <h1>Platform Intelligence</h1>
-             <div className="bg-slate-900 text-white px-3 py-1 rounded-full text-xs font-bold font-mono tracking-widest shadow-lg border border-slate-700 flex items-center gap-2">
-                <Clock size={12} color="#10B981" />
-                {currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+             <div className="luxury-clock-container">
+                <div className="luxury-clock-glass">
+                   <Clock size={14} className="luxury-clock-icon" />
+                   <span className="luxury-clock-time">
+                      {currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                   </span>
+                   <div className="luxury-clock-glow"></div>
+                </div>
              </div>
           </div>
-          <p>Analyzing {timeRange}ly growth and financial velocity.</p>
+          <p className="subtitle-premium">Analyzing {timeRange}ly growth and financial velocity.</p>
         </div>
         <div className="header-actions">
            {timeRange === 'year' && (
@@ -140,7 +146,7 @@ const Dashboard = () => {
                onChange={(e) => setSpecificYear(e.target.value)}
              >
                <option value="all">All Years</option>
-               {Array.from({ length: 5 }, (_, i) => 2026 + i).map(y => (
+               {Array.from({ length: Math.max(1, new Date().getFullYear() - 2024) }, (_, i) => 2025 + i).map(y => (
                  <option key={y} value={y}>{y}</option>
                ))}
              </select>
@@ -211,30 +217,34 @@ const Dashboard = () => {
       {/* Analytics Charts */}
       <div className="analytics-section flex gap-6 mt-6 mb-8">
         <div className="content-card chart-card flex-[2]">
-          <div className="card-header border-b border-slate-50 pb-4 mb-4">
+          <div className="card-header border-b border-slate-50 pb-4 mb-4 flex items-center justify-between">
             <div className="title-box">
-              <BarChart2 size={20} color="#6366F1" />
-              <h3>{timeRange.toUpperCase()}ly Financial Velocity</h3>
+              <BarChart2 size={20} className="text-indigo-600" />
+              <h3>Financial Velocity</h3>
             </div>
+            <div className="date-indicator">Real-time Stream</div>
           </div>
           <div className="chart-container">
             {loading ? (
-              <div className="loading-chart h-[300px] flex items-center justify-center text-xs text-slate-300 font-black tracking-widest animate-pulse">AGGREGATING TEMPORAL DATA...</div>
+              <div className="loading-chart h-[300px] flex items-center justify-center text-xs text-slate-300 font-bold tracking-widest animate-pulse">SYNCHRONIZING BUSINESS DATA...</div>
             ) : (
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#818CF8" stopOpacity={1} />
+                      <stop offset="100%" stopColor="#4F46E5" stopOpacity={1} />
+                    </linearGradient>
+                  </defs>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12, fontWeight: 600 }} dy={10} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12, fontWeight: 600 }} dx={-10} tickFormatter={(val) => `₹${val}`} />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 700 }} dy={10} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 700 }} dx={-10} tickFormatter={(val) => `₹${val}`} />
                   <Tooltip 
-                    cursor={{fill: '#f8fafc'}}
-                    contentStyle={{ borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', padding: '12px', fontWeight: 'bold' }}
+                    cursor={{fill: '#f8fafc', radius: 4}}
+                    contentStyle={{ borderRadius: '14px', border: 'none', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', padding: '16px', fontWeight: 'bold', fontSize: '12px' }}
+                    formatter={(value) => [`₹${value.toLocaleString()}`, 'Platform Revenue']}
                   />
-                  <Bar dataKey="revenue" fill="#6366F1" radius={[4, 4, 0, 0]} maxBarSize={40}>
-                     {chartData.map((entry, index) => (
-                       <Cell key={`cell-${index}`} fill={index === chartData.length - 1 ? '#4F46E5' : '#818CF8'} />
-                     ))}
-                  </Bar>
+                  <Bar dataKey="revenue" fill="url(#barGradient)" radius={[6, 6, 0, 0]} maxBarSize={36} animationDuration={1500} />
                 </BarChart>
               </ResponsiveContainer>
             )}
@@ -244,13 +254,13 @@ const Dashboard = () => {
         <div className="content-card chart-card flex-1">
           <div className="card-header border-b border-slate-50 pb-4 mb-4">
             <div className="title-box">
-              <TrendingUp size={20} color="#10B981" />
-              <h3>Revenue by Service</h3>
+              <TrendingUp size={20} className="text-amber-500" />
+              <h3>Market Share</h3>
             </div>
           </div>
-          <div className="chart-container flex items-center justify-center">
+          <div className="chart-container relative flex items-center justify-center">
             {loading ? (
-              <div className="loading-chart h-[300px] flex items-center justify-center text-xs text-slate-300 font-black tracking-widest animate-pulse">ANALYZING DISTRIBUTIONS...</div>
+              <div className="loading-chart h-[300px] flex items-center justify-center text-xs text-slate-300 font-bold tracking-widest animate-pulse">ANALYZING DISTRIBUTIONS...</div>
             ) : pieData.length > 0 ? (
               <ResponsiveContainer width="100%" height={300}>
                 <PieChart>
@@ -258,25 +268,40 @@ const Dashboard = () => {
                     data={pieData}
                     cx="50%"
                     cy="50%"
-                    innerRadius={60}
-                    outerRadius={90}
-                    paddingAngle={5}
+                    innerRadius={75}
+                    outerRadius={100}
+                    paddingAngle={8}
                     dataKey="value"
                     stroke="none"
+                    animationBegin={200}
                   >
                     {pieData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} cornerRadius={4} />
                     ))}
                   </Pie>
                   <Tooltip 
-                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', padding: '10px', fontWeight: 'bold' }}
-                    formatter={(value) => `₹${value}`}
+                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', padding: '12px', fontWeight: 'bold' }}
+                    formatter={(value, name, props) => [
+                      props.payload.count ? `${props.payload.count} Bookings` : `₹${value.toLocaleString()}`,
+                      name
+                    ]}
                   />
-                  <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{ fontSize: '11px', fontWeight: '600', color: '#64748b' }} />
+                  <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{ fontSize: '11px', fontWeight: '700', color: '#64748b' }} />
                 </PieChart>
               </ResponsiveContainer>
             ) : (
-                <div className="h-[300px] flex items-center justify-center text-xs text-slate-400 font-bold">No distribution data found</div>
+                <div className="empty-chart-fallback h-[300px] flex flex-col items-center justify-center">
+                   <div className="w-40 h-40 rounded-full border-4 border-dashed border-slate-100 flex items-center justify-center">
+                      <TrendingUp size={32} className="text-slate-200" />
+                   </div>
+                   <p className="text-[10px] text-slate-400 font-bold mt-4 uppercase tracking-widest">No matching transactional data</p>
+                </div>
+            )}
+            {pieData.length > 0 && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                 <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Growth</span>
+                 <span className="text-lg font-black text-slate-900">Live</span>
+              </div>
             )}
           </div>
         </div>
@@ -293,23 +318,28 @@ const Dashboard = () => {
               <div className="loading-state">Synchronizing with node...</div>
             ) : (
               recentBookings.map((booking) => (
-                <div key={booking._id} className="booking-item">
+                <div key={booking._id} className="booking-item card-hover">
                   <div className="booking-service">
-                    <div className="svc-icon-small">
-                      <Clock size={16} color="#6366F1" />
+                    <div className="svc-icon-premium">
+                      <Clock size={18} className="text-indigo-500" />
                     </div>
                     <div>
-                      <p className="svc-name">{booking.bookingId || `#${booking._id.slice(-6)}`} - {booking.serviceId?.name || 'Home Service'}</p>
-                      <p className="svc-time">{new Date(booking.createdAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</p>
+                      <p className="svc-name-bold">{booking.bookingId || `#${booking._id.slice(-6)}`} • {booking.serviceId?.name || 'Service'}</p>
+                      <p className="svc-time-mini">{new Date(booking.createdAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</p>
                     </div>
                   </div>
-                  <div className="booking-status flex flex-col items-center">
-                    <span className={`status-pill ${booking.status}`}>{booking.status.replace('_', ' ')}</span>
-                    {booking.completionOtp && <p className="text-[10px] font-bold text-slate-500 mt-1">PIN: {booking.completionOtp}</p>}
+                  <div className="booking-status-box">
+                    <span className={`status-badge-premium ${booking.status}`}>{booking.status.replace('_', ' ')}</span>
+                    {booking.completionOtp && (
+                       <div className="pin-pill-luxury">
+                          <span className="label">SECURE PIN:</span>
+                          <span className="value">{booking.completionOtp}</span>
+                       </div>
+                    )}
                   </div>
-                  <div className="booking-amount">
-                    <p className="amt">₹{booking.totalAmount}</p>
-                    <p className="method">Admin: ₹{(booking.platformFee || 0) + (booking.commissionFee || 0)}</p>
+                  <div className="booking-financials">
+                    <p className="amt-primary">₹{booking.totalAmount}</p>
+                    <p className="amt-secondary">Node Fee: ₹{(booking.platformFee || 0) + (booking.commissionFee || 0)}</p>
                   </div>
                 </div>
               ))

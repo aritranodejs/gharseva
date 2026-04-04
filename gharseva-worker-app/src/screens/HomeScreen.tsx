@@ -376,9 +376,9 @@ export default function HomeScreen(props: any) {
                 <Text style={styles.ratingText}>{workerData?.rating || '4.8'} • Top Pro</Text>
               </View>
               <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: '#D1D5DB' }} />
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Clock size={12} color="#4F46E5" style={{ marginRight: 4 }} />
-                <Text style={{ fontSize: 11, fontWeight: '800', color: '#4F46E5', fontVariant: ['tabular-nums'] }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#0F172A', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, borderWidth: 1.5, borderColor: '#FBBF24', shadowColor: '#FBBF24', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.2, shadowRadius: 5, elevation: 3 }}>
+                <Clock size={12} color="#FBBF24" style={{ marginRight: 5 }} />
+                <Text style={{ fontSize: 11, fontWeight: '900', color: '#FBBF24', fontVariant: ['tabular-nums'], letterSpacing: 0.3 }}>
                   {currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                 </Text>
               </View>
@@ -429,9 +429,15 @@ export default function HomeScreen(props: any) {
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#4F46E5']} />}>
         <View style={styles.summaryRow}>
-          <TouchableOpacity style={styles.summaryCard} onPress={() => navigation.navigate('Profile')}>
+          <TouchableOpacity style={styles.summaryCard} onPress={() => navigation.navigate('Earnings')}>
             <View style={[styles.summaryIcon, { backgroundColor: '#F0FDF4' }]}><Wallet size={20} color="#16A34A" /></View>
-            <View><Text style={styles.summaryLabel}>Total Earnings</Text><Text style={styles.summaryValue}>₹{workerData?.totalEarnings || 0}</Text></View>
+            <View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <Text style={styles.summaryLabel}>Total Earnings</Text>
+                <ChevronRightIcon size={10} color="#9CA3AF" />
+              </View>
+              <Text style={styles.summaryValue}>₹{workerData?.totalEarnings || 0}</Text>
+            </View>
           </TouchableOpacity>
           <TouchableOpacity style={styles.summaryCard} onPress={() => navigation.navigate('Profile')}>
             <View style={[styles.summaryIcon, { backgroundColor: '#EEF2FF' }]}><Star size={20} color="#4F46E5" fill="#4F46E5" /></View>
