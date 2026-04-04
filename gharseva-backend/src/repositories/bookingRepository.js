@@ -61,8 +61,12 @@ class BookingRepository {
 
   async updateInternalStatus(id, status, workerId = null) {
     // Internal update: used by AssignmentService to set initial worker
-    const update = { status };
-    if (workerId) update.assignedWorkerId = workerId;
+    const update = { $set: { status } };
+    if (workerId) {
+      update.$set.assignedWorkerId = workerId;
+    } else if (workerId === null) {
+      update.$unset = { assignedWorkerId: 1 };
+    }
     return await Booking.findByIdAndUpdate(id, update, { new: true });
   }
 

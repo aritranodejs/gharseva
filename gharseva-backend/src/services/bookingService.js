@@ -51,11 +51,17 @@ class BookingService {
     const booking = await this.bookingRepository.findById(bookingId);
     if (!booking) throw new Error('Booking not found');
 
+    const assignedId = booking.assignedWorkerId?._id || booking.assignedWorkerId;
+
+    // Gracefully handle if the worker accidentally double-taps
+    if (booking.status === BOOKING_STATUS.CONFIRMED && String(assignedId) === String(workerId)) {
+        return booking;
+    }
+
     if (![BOOKING_STATUS.PENDING_ACCEPTANCE, BOOKING_STATUS.SEARCHING].includes(booking.status)) {
       throw new Error('This job is no longer available.');
     }
 
-    const assignedId = booking.assignedWorkerId?._id || booking.assignedWorkerId;
     if (assignedId && String(assignedId) !== String(workerId)) {
       throw new Error('This job was already claimed by another professional.');
     }
@@ -70,7 +76,8 @@ class BookingService {
 
     // Trigger Socket.io (if global.io exists)
     if (global.io) {
-      global.io.to(`user_${booking.userId}`).emit('booking_confirmed', {
+      const uId = booking.userId?._id || booking.userId;
+      global.io.to(`user_${uId}`).emit('booking_confirmed', {
         bookingId: booking._id,
         bookingDisplayId: booking.bookingId,
         workerName: workerName
@@ -84,10 +91,12 @@ class BookingService {
     }
 
     // CREATE PERSISTENT NOTIFICATIONS
+    const extractedUserId = booking.userId?._id || booking.userId;
+    const serviceTitle = booking.serviceId?.name || booking.serviceName || 'Service';
     await notificationService.createNotification({
-       userId: booking.userId,
+       userId: extractedUserId,
        title: 'Booking Confirmed!',
-       message: `${workerName} has accepted your ${booking.serviceName} request.`,
+       message: `${workerName} has accepted your ${serviceTitle} request.`,
        type: 'booking'
     });
 
@@ -140,8 +149,10 @@ class BookingService {
     const updatedBooking = await this.bookingRepository.updateStatus(bookingId, status, workerId, updates);
     if (!updatedBooking) throw new Error('Booking update failed or unauthorized');
 
+    const uId = booking.userId?._id || booking.userId;
+
     if (global.io) {
-      global.io.to(`user_${booking.userId}`).emit('booking_status_update', { 
+      global.io.to(`user_${uId}`).emit('booking_status_update', { 
         bookingId: booking._id, 
         bookingDisplayId: booking.bookingId,
         status 
@@ -150,10 +161,11 @@ class BookingService {
 
     // Notify user of completion
     if (status === 'completed') {
+      const serviceTitle = booking.serviceId?.name || booking.serviceName || 'Service';
       await notificationService.createNotification({
-         userId: booking.userId,
+         userId: uId,
          title: 'Service Completed',
-         message: `Your ${booking.serviceName} has been successfully completed.`,
+         message: `Your ${serviceTitle} has been successfully completed.`,
          type: 'booking'
       });
     }
@@ -256,9 +268,12 @@ class BookingService {
 
     // Notify the other party
     if (global.io) {
+      const wIdTarget = booking.assignedWorkerId?._id || booking.assignedWorkerId;
+      const uIdTarget = booking.userId?._id || booking.userId;
+      
       const targetRoom = cancelledBy === 'user' 
-        ? `worker_${booking.assignedWorkerId}` 
-        : `user_${booking.userId}`;
+        ? `worker_${wIdTarget}` 
+        : `user_${uIdTarget}`;
       
       global.io.to(targetRoom).emit('booking_cancelled', {
         bookingId: booking._id,
@@ -302,9 +317,10 @@ class BookingService {
     // Decrement worker's active count
     await Worker.findByIdAndUpdate(workerId, { $inc: { activeBookingsCount: -1 } });
 
+    const uId = booking.userId?._id || booking.userId;
     // Notify user of worker cancellation
     if (global.io) {
-      global.io.to(`user_${booking.userId}`).emit('worker_cancelled_job', {
+      global.io.to(`user_${uId}`).emit('worker_cancelled_job', {
         bookingId: booking._id,
         reason
       });
@@ -312,7 +328,7 @@ class BookingService {
 
     // CREATE NOTIFICATION for user
     await notificationService.createNotification({
-       userId: booking.userId,
+       userId: uId,
        title: 'Professional Cancelled',
        message: `The professional has cancelled the job due to: ${reason}. We are searching for a replacement.`,
        type: 'booking'
