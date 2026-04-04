@@ -36,9 +36,21 @@ class BookingController {
     }
   }
 
-  async getDetails(req, res) {
+  async getWorkerHistory(req, res) {
     try {
-      const booking = await bookingService.getBookingDetails(req.params.id);
+      const bookings = await bookingService.getWorkerHistory(req.worker._id);
+      sendSuccess(res, bookings);
+    } catch (err) {
+      sendError(res, err.message, 400);
+    }
+  }
+
+  async getById(req, res) {
+    try {
+      const { id } = req.params;
+      const userId = req.user ? req.user.id : null;
+      const workerId = req.worker ? req.worker._id : null;
+      const booking = await bookingService.getBookingById(id, userId, workerId);
       sendSuccess(res, booking);
     } catch (err) {
       sendError(res, err.message, 404);
@@ -48,43 +60,62 @@ class BookingController {
   async updateStatus(req, res) {
     try {
       const { id } = req.params;
-      const { status, cancellationReason } = req.body;
+      const { status, cancellationReason, otp } = req.body;
       const uploadFiles = req.files || {};
       
-      const updateData = { status, cancellationReason };
+      const additionalUpdates = { cancellationReason };
 
-      // Handle service verification images (before/after)
       if (uploadFiles['beforeServiceImage']) {
-        updateData.beforeServiceImage = await uploadFileBuffer(uploadFiles['beforeServiceImage'][0], '/uploads/beforeServiceImages');
+        additionalUpdates.beforeServiceImage = await uploadFileBuffer(uploadFiles['beforeServiceImage'][0], '/uploads/beforeServiceImages');
       }
       if (uploadFiles['afterServiceImage']) {
-        updateData.afterServiceImage = await uploadFileBuffer(uploadFiles['afterServiceImage'][0], '/uploads/afterServiceImages');
+        additionalUpdates.afterServiceImage = await uploadFileBuffer(uploadFiles['afterServiceImage'][0], '/uploads/afterServiceImages');
       }
 
-      const booking = await bookingService.updateBookingStatus(id, updateData);
+      const booking = await bookingService.updateBookingStatus(id, req.worker._id, status, null, otp, additionalUpdates);
       sendSuccess(res, booking, `Booking status updated to ${status}`);
     } catch (err) {
       sendError(res, err.message, 400);
     }
   }
 
-  async acceptJob(req, res) {
+  async acceptBooking(req, res) {
     try {
-      const booking = await bookingService.acceptBooking(req.params.id, req.worker._id);
+      const booking = await bookingService.acceptBooking(req.params.id, req.worker._id, req.worker.name);
       sendSuccess(res, booking, 'Job accepted successfully');
     } catch (err) {
       sendError(res, err.message, 400);
     }
   }
 
-  async cancelJob(req, res) {
+  async cancel(req, res) {
     try {
+      const { id } = req.params;
       const { reason } = req.body;
-      const booking = await bookingService.updateBookingStatus(req.params.id, { 
-        status: 'cancelled', 
-        cancellationReason: reason 
-      });
-      sendSuccess(res, booking, 'Job cancelled');
+      const booking = await bookingService.cancelBooking(id, req.user.id, null, reason, 'user');
+      sendSuccess(res, booking, 'Booking cancelled successfully');
+    } catch (err) {
+      sendError(res, err.message, 400);
+    }
+  }
+
+  async rebroadcast(req, res) {
+    try {
+      const { id } = req.params;
+      const assignmentService = require('../services/assignmentService');
+      await assignmentService.assignWorkerToBooking(id);
+      sendSuccess(res, null, 'Searching for professionals...');
+    } catch (err) {
+      sendError(res, err.message, 400);
+    }
+  }
+
+  async workerCancel(req, res) {
+    try {
+      const { id } = req.params;
+      const { reason } = req.body;
+      const booking = await bookingService.workerCancelBooking(id, req.worker._id, reason);
+      sendSuccess(res, booking, 'Job cancelled. We are searching for a replacement.');
     } catch (err) {
       sendError(res, err.message, 400);
     }
