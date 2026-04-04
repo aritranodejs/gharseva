@@ -6,8 +6,15 @@ const { uploadFileBuffer } = require('../services/imageUpload');
 
 class UserController {
   async sendOtp(req, res) {
-    const { phoneNumber } = req.body;
+    const { phoneNumber, isAdminLogin } = req.body;
     if (!phoneNumber) return sendError(res, 'Phone number is required', 400);
+
+    if (isAdminLogin) {
+      const user = await require('../models/User').findOne({ phoneNumber, role: 'admin' });
+      if (!user) {
+         return sendError(res, 'Invalid mobile number entered for admin', 403);
+      }
+    }
 
     // Generate random 6-digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -22,9 +29,9 @@ class UserController {
   }
 
   async verifyOtp(req, res) {
-    const { phoneNumber, otp } = req.body;
+    const { phoneNumber, otp, isAdminLogin } = req.body;
     try {
-      const data = await userService.verifyOtp(phoneNumber, otp);
+      const data = await userService.verifyOtp(phoneNumber, otp, isAdminLogin);
       sendSuccess(res, data, 'Login successful');
     } catch (err) {
       sendError(res, err.message, 400);

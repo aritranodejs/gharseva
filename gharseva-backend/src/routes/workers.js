@@ -105,4 +105,6 @@ router.patch('/bookings/:id/cancel', protectWorker, bookingController.cancel);
  */
 router.post('/push-token', protectWorker, workerController.savePushToken);
 
+router.get('/earnings', protectWorker, workerController.getEarnings);
+
 module.exports = router;

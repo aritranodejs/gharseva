@@ -94,6 +94,58 @@ class WorkerService {
   async updateLocation(id, coordinates) {
     return await workerRepository.updateLocation(id, coordinates);
   }
+
+  async getWorkerEarnings(workerId, range, specificYear) {
+    const Booking = require('../models/Booking');
+    let startDate;
+    let endDate;
+
+    const now = new Date();
+
+    if (specificYear && specificYear !== 'all') {
+      const targetYear = parseInt(specificYear);
+      startDate = new Date(targetYear, 0, 1);
+      endDate = new Date(targetYear + 1, 0, 1);
+    } else {
+      if (range === 'day') {
+        startDate = new Date(new Date().setHours(0, 0, 0, 0));
+      } else if (range === 'week') {
+        startDate = new Date(new Date().setDate(now.getDate() - 7));
+      } else if (range === 'month') {
+        startDate = new Date(new Date().setMonth(now.getMonth() - 1));
+      } else if (range === 'year') {
+        startDate = new Date(new Date().setFullYear(now.getFullYear() - 1));
+      } else {
+        startDate = new Date(0); // All time
+      }
+    }
+
+    const dateMatch = {
+      assignedWorkerId: workerId,
+      status: 'completed',
+      ...(startDate && {
+        $or: [
+          { completedAt: { $gte: startDate, ...(endDate ? { $lt: endDate } : {}) } },
+          { updatedAt: { $gte: startDate, ...(endDate ? { $lt: endDate } : {}) } }
+        ]
+      })
+    };
+
+    const bookings = await Booking.find(dateMatch).populate('serviceId', 'name').sort({ updatedAt: -1 });
+
+    const totalEarnings = bookings.reduce((sum, b) => sum + (b.workerEarnings || b.price || 0), 0);
+
+    return {
+      totalEarnings,
+      completedJobs: bookings.length,
+      bookings: bookings.map(b => ({
+        bookingId: b.bookingId || b._id.toString().slice(-6),
+        serviceName: b.serviceId?.name || 'Home Service',
+        amount: b.workerEarnings || b.price,
+        date: b.completedAt || b.updatedAt
+      }))
+    };
+  }
 }
 
 module.exports = new WorkerService();

@@ -17,7 +17,7 @@ const Login = () => {
     setLoading(true);
     setError(null);
     try {
-      await api.post('/auth/send-otp', { phoneNumber });
+      await api.post('/auth/send-otp', { phoneNumber, isAdminLogin: true });
       setOtpSent(true);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to send OTP');
@@ -31,7 +31,7 @@ const Login = () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.post('/auth/verify-otp', { phoneNumber, otp });
+      const res = await api.post('/auth/verify-otp', { phoneNumber, otp, isAdminLogin: true });
       if (res.data.data.role !== 'admin') {
         setError('Access denied. This portal is for administrators only.');
         return;

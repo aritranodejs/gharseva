@@ -143,6 +143,16 @@ class WorkerController {
       sendError(res, 'Error saving push token');
     }
   }
+
+  async getEarnings(req, res) {
+    const { range = 'all', specificYear } = req.query;
+    try {
+      const data = await workerService.getWorkerEarnings(req.worker._id, range, specificYear);
+      sendSuccess(res, data);
+    } catch (err) {
+      sendError(res, err.message);
+    }
+  }
 }
 
 module.exports = new WorkerController();

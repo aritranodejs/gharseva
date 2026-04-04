@@ -221,7 +221,7 @@ const Bookings = () => {
                   <tr key={booking._id}>
                     <td>
                       <p className="text-xs font-bold text-indigo-600 uppercase tracking-widest">{booking.bookingId || `#${booking._id.slice(-8)}`}</p>
-                      <p className="text-[10px] text-slate-400 mt-0.5">{new Date(booking.createdAt).toLocaleDateString()}</p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">{new Date(booking.createdAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</p>
                     </td>
                     <td>
                       <div className="flex flex-col">

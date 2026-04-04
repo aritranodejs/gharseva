@@ -91,6 +91,12 @@ export default function HomeScreen() {
   
   const scrollRef = React.useRef<ScrollView>(null);
   const [currentSlide, setCurrentSlide] = useState(0);
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     setupSocket();
@@ -525,11 +531,20 @@ export default function HomeScreen() {
 
         {/* Premium Logo & Search Wrapper */}
         <View style={styles.brandingRow}>
-           <Image source={require('../../assets/logo_premium.png')} style={styles.logoImg} resizeMode="contain" />
-           <Text style={styles.logoText}>GharSeva</Text>
-           <View style={styles.trustBadge}>
-              <ShieldCheck size={12} color="#10B981" />
-              <Text style={styles.trustText}>Verified</Text>
+           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+             <Image source={require('../../assets/logo_premium.png')} style={styles.logoImg} resizeMode="contain" />
+             <Text style={styles.logoText}>GharSeva</Text>
+             <View style={styles.trustBadge}>
+                <ShieldCheck size={12} color="#10B981" />
+                <Text style={styles.trustText}>Verified</Text>
+             </View>
+           </View>
+           <View style={{ flex: 1 }} />
+           <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, borderWidth: 1, borderColor: '#F1F5F9' }}>
+              <Clock size={12} color="#4F46E5" style={{ marginRight: 4 }} />
+              <Text style={{ fontSize: 11, fontWeight: '800', color: '#4F46E5', fontVariant: ['tabular-nums'] }}>
+                {currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+              </Text>
            </View>
         </View>
 

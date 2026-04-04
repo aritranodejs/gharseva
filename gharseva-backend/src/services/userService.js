@@ -4,7 +4,7 @@ const { uploadImage } = require('../services/imageUpload');
 const tokenStore = require('../utils/tokenStore');
 
 class UserService {
-  async verifyOtp(phoneNumber, otp) {
+  async verifyOtp(phoneNumber, otp, isAdminLogin = false) {
     const storedOtp = await tokenStore.get(`otp_${phoneNumber}`);
     
     // Safety: allow 123456 for testing if needed, but primary is storedOtp
@@ -16,8 +16,15 @@ class UserService {
     await tokenStore.del(`otp_${phoneNumber}`);
 
     let user = await userRepository.findByPhone(phoneNumber);
-    if (!user) {
-      user = await userRepository.create({ phoneNumber, isVerified: true });
+    
+    if (isAdminLogin) {
+      if (!user || user.role !== 'admin') {
+         throw new Error('Invalid mobile number entered for admin');
+      }
+    } else {
+      if (!user) {
+        user = await userRepository.create({ phoneNumber, isVerified: true });
+      }
     }
 
     const tokens = generateTokens(user._id, user.role);

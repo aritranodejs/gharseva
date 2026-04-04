@@ -99,6 +99,12 @@ export default function HomeScreen(props: any) {
   const [completionPin, setCompletionPin] = useState('');
   const [completing, setCompleting] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -364,9 +370,18 @@ export default function HomeScreen(props: any) {
           />
           <View style={styles.userText}>
             <Text style={styles.greeting}>Welcome, {workerData?.name?.split(' ')[0] || 'Partner'}</Text>
-            <View style={styles.ratingRow}>
-              <Star size={12} color="#F59E0B" fill="#F59E0B" />
-              <Text style={styles.ratingText}>{workerData?.rating || '4.8'} • Top Pro</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 10 }}>
+              <View style={styles.ratingRow}>
+                <Star size={12} color="#F59E0B" fill="#F59E0B" />
+                <Text style={styles.ratingText}>{workerData?.rating || '4.8'} • Top Pro</Text>
+              </View>
+              <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: '#D1D5DB' }} />
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Clock size={12} color="#4F46E5" style={{ marginRight: 4 }} />
+                <Text style={{ fontSize: 11, fontWeight: '800', color: '#4F46E5', fontVariant: ['tabular-nums'] }}>
+                  {currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                </Text>
+              </View>
             </View>
           </View>
         </TouchableOpacity>
