@@ -299,7 +299,9 @@ export default function ConfirmationScreen({ route, navigation }: Props) {
           {/* Elegant Address Section */}
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitleText}>Service Location</Text>
-            <TouchableOpacity><Text style={styles.changeBtnText}>Detect Location</Text></TouchableOpacity>
+            <TouchableOpacity onPress={() => setAddressModalVisible(true)}>
+              <Text style={styles.changeBtnText}>Change / Select Location</Text>
+            </TouchableOpacity>
           </View>
           <TouchableOpacity style={styles.addressCard} onPress={() => setAddressModalVisible(true)} activeOpacity={0.8}>
              <View style={styles.addressHeader}>
@@ -323,10 +325,11 @@ export default function ConfirmationScreen({ route, navigation }: Props) {
           <View style={styles.paymentBox}>
              {PAYMENT_METHODS.filter(method => {
                 if (!config) return true;
-                if (method.id === 'upi' && config.acceptUPI === false) return false;
-                if (method.id === 'cash' && config.acceptCOD === false) return false;
-                if (method.id === 'card' && config.acceptCard === false) return false;
-                if (method.id === 'bank' && config.acceptBank === false) return false;
+                const isFalse = (val: any) => val === false || String(val) === 'false';
+                if (method.id === 'upi' && isFalse(config.acceptUPI)) return false;
+                if (method.id === 'cash' && isFalse(config.acceptCOD)) return false;
+                if (method.id === 'card' && isFalse(config.acceptCard)) return false;
+                if (method.id === 'bank' && isFalse(config.acceptBank)) return false;
                 return true;
              }).map((method) => (
                 <TouchableOpacity 
