@@ -44,6 +44,13 @@ class UserController {
     try {
       const uploadFiles = req.files || {};
       const updates = { ...req.body };
+      
+      // Safety guard: if a base64 string is passed in the body, ignore it.
+      // We only want to save URL paths from the file upload or existing paths.
+      if (typeof updates.profilePicture === 'string' && updates.profilePicture.startsWith('data:image')) {
+        delete updates.profilePicture;
+      }
+
       if (uploadFiles && uploadFiles['profilePicture'] && uploadFiles['profilePicture'].length > 0) {
         // Upload to standardized /uploads path
         updates.profilePicture = await uploadFileBuffer(uploadFiles['profilePicture'][0], '/uploads/profilePicture');

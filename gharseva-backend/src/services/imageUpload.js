@@ -26,33 +26,50 @@ if (IMAGEKIT_ENABLED) {
  * @param {string} folder      - Destination folder path (must start with /uploads)
  * @returns {Promise<string>}  - The saved image path (to be stored in DB)
  */
-const uploadFileBuffer = async (multerFile, folder = '/uploads/others') => {
+const uploadFileBuffer = async (multerFile, folder = 'uploads/others') => {
   if (IMAGEKIT_ENABLED && imagekit) {
-    // --- Upload to ImageKit ---
-    const response = await imagekit.upload({
-      file: multerFile.buffer.toString('base64'),
-      fileName: `${Date.now()}_${multerFile.originalname}`,
-      folder: folder,
-      useUniqueFileName: true,
-    });
-    // Return only the filePath (e.g. /uploads/profilePicture/123.jpg)
-    return response.filePath;
-  } else {
-    // --- Save locally to /uploads ---
-    const uploadsBaseDir = path.join(__dirname, '../../'); // Project root
-    const targetDir = path.join(uploadsBaseDir, folder);
-    
-    if (!fs.existsSync(targetDir)) {
-      fs.mkdirSync(targetDir, { recursive: true });
+    try {
+      // Clean folder name (remove leading slash)
+      const cleanFolder = folder.startsWith('/') ? folder.slice(1) : folder;
+      
+      console.log(`[ImageUpload] Attempting Cloud upload for: ${multerFile.originalname} to ${cleanFolder}`);
+      
+      // --- Upload ONLY to ImageKit ---
+      const response = await imagekit.upload({
+        file: multerFile.buffer, // Pass buffer directly (faster/more reliable)
+        fileName: `${Date.now()}_${multerFile.originalname}`,
+        folder: cleanFolder,
+        useUniqueFileName: true,
+      });
+
+      console.log(`[ImageUpload] ✅ Cloud SUCCESS: ${response.url}`);
+      return response.filePath;
+    } catch (err) {
+      console.error('[ImageUpload] ❌ Cloud Error:', err.message);
+      // Fallback: If cloud fails, save locally so we don't lose the data
+      console.log('[ImageUpload] ⚠️ Falling back to Local Storage...');
+      return await saveLocally(multerFile, folder); 
     }
-
-    const localFileName = `${Date.now()}_${multerFile.originalname}`;
-    const filePath = path.join(targetDir, localFileName);
-    fs.writeFileSync(filePath, multerFile.buffer);
-
-    // Return the relative path (consistent with ImageKit filePath)
-    return `${folder}/${localFileName}`;
+  } else {
+    return await saveLocally(multerFile, folder);
   }
+};
+
+const saveLocally = async (multerFile, folder) => {
+  const uploadsBaseDir = path.join(__dirname, '../../');
+  const targetDir = path.join(uploadsBaseDir, folder.startsWith('/') ? folder : `/${folder}`);
+  
+  if (!fs.existsSync(targetDir)) {
+    fs.mkdirSync(targetDir, { recursive: true });
+  }
+
+  const localFileName = `${Date.now()}_${multerFile.originalname}`;
+  const filePath = path.join(targetDir, localFileName);
+  fs.writeFileSync(filePath, multerFile.buffer);
+
+  const relativePath = folder.startsWith('/') ? `${folder}/${localFileName}` : `/${folder}/${localFileName}`;
+  console.log(`[ImageUpload] 💾 Local SAVE: ${relativePath}`);
+  return relativePath;
 };
 
 module.exports = { uploadFileBuffer, IMAGEKIT_ENABLED };

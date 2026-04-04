@@ -158,10 +158,14 @@ export default function HomeScreen(props: any) {
     }
   };
 
+  const [availableJobs, setAvailableJobs] = useState<ActiveJob[]>([]);
+
   const fetchActiveJobs = async () => {
     try {
       const response = await api.get('/workers/bookings');
-      setActiveJobs(response.data.data);
+      // Response is now { active: [], available: [] }
+      setActiveJobs(response.data.data.active || []);
+      setAvailableJobs(response.data.data.available || []);
     } catch (err) {
       console.log('Error fetching active jobs', err);
     }
@@ -420,10 +424,51 @@ export default function HomeScreen(props: any) {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.sectionHeader}><Text style={styles.sectionTitle}>Active Jobs</Text></View>
+        <View style={styles.sectionHeader}><Text style={styles.sectionTitle}>Available Near You</Text></View>
+
+        {availableJobs.length === 0 ? (
+          <View style={styles.emptyCard}>
+            <Zap size={32} color="#D1D5DB" />
+            <Text style={styles.emptyTitle}>No Jobs Available</Text>
+            <Text style={styles.emptySub}>We'll notify you when a new request matches your skills.</Text>
+          </View>
+        ) : (
+          availableJobs.map((job) => (
+            <TouchableOpacity 
+              key={job._id} 
+              style={[styles.jobCard, { borderColor: '#4F46E5', borderStyle: 'dashed' }]}
+              onPress={() => acceptJobRequest(job._id)}
+            >
+              <View style={styles.jobHeader}>
+                <View style={styles.serviceBox}>
+                  <View style={[styles.jobIconBack, { backgroundColor: '#EEF2FF' }]}>{getIcon(job.serviceId?.icon || '', 24, '#4F46E5')}</View>
+                  <View>
+                    <Text style={styles.jobIdSmall}>{job.bookingId || `#${job._id.slice(-6).toUpperCase()}`}</Text>
+                    <Text style={styles.jobService}>{job.serviceId?.name}</Text>
+                  </View>
+                </View>
+                <View style={[styles.statusBadge, { backgroundColor: '#4F46E5' }]}>
+                  <Text style={[styles.statusText, { color: '#FFF' }]}>CLAIM NOW</Text>
+                </View>
+              </View>
+              <View style={styles.locationRow}><MapPin size={14} color="#6B7280" /><Text style={styles.jobAddress} numberOfLines={1}>{job.address}</Text></View>
+              <View style={styles.earningsBreakdown}>
+                 <View style={[styles.earningRow, { backgroundColor: '#ECFDF5', padding: 8, borderRadius: 8 }]}>
+                    <Text style={[styles.earningLabel, { color: '#065F46' }]}>POTENTIAL EARNINGS</Text>
+                    <Text style={[styles.earningValue, { color: '#059669' }]}>₹{job.workerEarnings || job.price}</Text>
+                 </View>
+              </View>
+              <TouchableOpacity style={styles.startBtn} onPress={() => acceptJobRequest(job._id)}>
+                <Text style={styles.btnText}>Accept Job Request</Text>
+              </TouchableOpacity>
+            </TouchableOpacity>
+          ))
+        )}
+
+        <View style={styles.sectionHeader}><Text style={styles.sectionTitle}>My Active Jobs</Text></View>
 
         {activeJobs.length === 0 ? (
-          <View style={styles.emptyCard}><Briefcase size={48} color="#D1D5DB" /><Text style={styles.emptyTitle}>No Active Jobs</Text><Text style={styles.emptySub}>Online workers get matched faster.</Text></View>
+          <View style={styles.emptyCard}><Briefcase size={48} color="#D1D5DB" /><Text style={styles.emptyTitle}>No Active Jobs</Text><Text style={styles.emptySub}>Claim available jobs to start earning.</Text></View>
         ) : (
           activeJobs.map((job) => (
             <View key={job._id} style={[styles.jobCard, job.subscriptionId && styles.premiumCard]}>

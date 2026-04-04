@@ -27,6 +27,26 @@ const settingsSchema = mongoose.Schema(
       type: Number,
       default: 10,
     },
+    acceptCOD: {
+      type: Boolean,
+      default: true,
+    },
+    acceptUPI: {
+      type: Boolean,
+      default: true,
+    },
+    acceptCard: {
+      type: Boolean,
+      default: true,
+    },
+    acceptBank: {
+      type: Boolean,
+      default: true,
+    },
+    razorpayEnabled: {
+      type: Boolean,
+      default: false,
+    },
   },
   {
     timestamps: true,

@@ -19,8 +19,14 @@ router.patch('/settings', protect, adminOnly, adminController.updateSettings);
 router.get('/export', protect, adminOnly, adminController.exportTransactions);
 router.get('/bookings', protect, adminOnly, adminController.getAllBookings);
 
+// User/Customer Management
+router.get('/users', protect, adminOnly, adminController.getUsers);
+router.patch('/users/:id', protect, adminOnly, upload.single('profilePicture'), adminController.updateUser);
+router.delete('/users/:id', protect, adminOnly, adminController.deleteUser);
+
 // Worker Management
 router.get('/workers', protect, adminOnly, adminController.getWorkers);
+router.delete('/workers/:id', protect, adminOnly, adminController.deleteWorker);
 router.patch('/workers/:id', protect, adminOnly, upload.fields([
   { name: 'profilePicture', maxCount: 1 },
   { name: 'aadhaarImage', maxCount: 1 },

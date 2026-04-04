@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
-import { ArrowLeft, CheckCircle2, CreditCard, Banknote, Smartphone, ChevronRight, ShieldCheck, Clock, MapPin, Trash2 } from 'lucide-react-native';
+import { ArrowLeft, CheckCircle2, CreditCard, Banknote, Smartphone, ChevronRight, ShieldCheck, Clock, MapPin, Trash2, Landmark } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import api from '../services/api';
 import AddressSelectorModal from '../components/AddressSelectorModal';
@@ -12,6 +12,8 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Confirmation'>;
 
 const PAYMENT_METHODS = [
   { id: 'upi', name: 'UPI (GPay/PhonePe/Paytm)', icon: <Smartphone size={20} color="#4F46E5" />, sub: 'Instant transfer via UPI' },
+  { id: 'card', name: 'Credit / Debit Card', icon: <CreditCard size={20} color="#F59E0B" />, sub: 'Secure card payment' },
+  { id: 'bank', name: 'Direct Bank Transfer', icon: <Landmark size={20} color="#8B5CF6" />, sub: 'NEFT / RTGS / IMPS' },
   { id: 'cash', name: 'Cash After Service', icon: <Banknote size={20} color="#10B981" />, sub: 'Pay at your doorstep' },
 ];
 
@@ -51,7 +53,15 @@ export default function ConfirmationScreen({ route, navigation }: Props) {
         }
 
         if (configRes.data.success) {
-          setConfig(configRes.data.data);
+          const cfg = configRes.data.data;
+          setConfig(cfg);
+          
+          if (cfg.acceptUPI === false) {
+             if (cfg.acceptCard !== false) setSelectedPayment('card');
+             else if (cfg.acceptBank !== false) setSelectedPayment('bank');
+             else if (cfg.acceptCOD !== false) setSelectedPayment('cash');
+             else setSelectedPayment('');
+          }
         }
       } catch (err) {}
     };
@@ -311,7 +321,14 @@ export default function ConfirmationScreen({ route, navigation }: Props) {
           {/* Payment Methods */}
           <Text style={styles.sectionTitleText}>Payment Options</Text>
           <View style={styles.paymentBox}>
-             {PAYMENT_METHODS.map((method) => (
+             {PAYMENT_METHODS.filter(method => {
+                if (!config) return true;
+                if (method.id === 'upi' && config.acceptUPI === false) return false;
+                if (method.id === 'cash' && config.acceptCOD === false) return false;
+                if (method.id === 'card' && config.acceptCard === false) return false;
+                if (method.id === 'bank' && config.acceptBank === false) return false;
+                return true;
+             }).map((method) => (
                 <TouchableOpacity 
                    key={method.id} 
                    style={[styles.payOption, selectedPayment === method.id && styles.payOptionActive]}
@@ -392,6 +409,22 @@ export default function ConfirmationScreen({ route, navigation }: Props) {
               {(!savedMethods.length || upiId === '') && (
                  <Text style={styles.upiHintText}>We support GPay, PhonePe, Paytm & all UPI apps</Text>
               )}
+            </View>
+          )}
+          
+          {selectedPayment === 'card' && (
+            <View style={styles.upiInputBox}>
+              <CreditCard size={18} color="#F59E0B" style={{ marginBottom: 10 }} />
+              <Text style={styles.upiInputLabel}>Select Saved Card or Add New</Text>
+              <Text style={styles.upiHintText}>You will be redirected to the secure payment gateway to enter your card details and verification OTP.</Text>
+            </View>
+          )}
+
+          {selectedPayment === 'bank' && (
+            <View style={styles.upiInputBox}>
+               <Landmark size={18} color="#8B5CF6" style={{ marginBottom: 10 }} />
+               <Text style={styles.upiInputLabel}>Bank Transfer Instructions</Text>
+               <Text style={styles.upiHintText}>After confirmation, our platform will provide you with the Virtual Account details to complete your bank transfer (IMPS/RTGS/NEFT).</Text>
             </View>
           )}
 

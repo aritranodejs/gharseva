@@ -38,6 +38,18 @@ router.patch('/:id/cancel', protectAny, bookingController.cancel);
  */
 router.post('/:id/rebroadcast', protect, bookingController.rebroadcast);
 
+const upload = require('../middleware/uploadMiddleware');
+
+/**
+ * @route   PATCH /api/bookings/:id/status
+ * @desc    Worker updates booking status (with optional evidence photos)
+ * @access  Private (Worker only)
+ */
+router.patch('/:id/status', protectWorker, upload.fields([
+  { name: 'beforeServiceImages', maxCount: 5 },
+  { name: 'afterServiceImages', maxCount: 5 }
+]), bookingController.updateStatus);
+
 /**
  * @route   PATCH /api/bookings/:id/worker-cancel
  * @desc    Worker cancels an assigned job

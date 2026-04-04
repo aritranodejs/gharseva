@@ -67,37 +67,64 @@ const Bookings = () => {
   const exportToPDF = () => {
     setExporting(true);
     try {
-      const doc = new jsPDF({ orientation: 'landscape' });
-      doc.setFontSize(18);
-      doc.text('GharSeva Platform Global Booking History', 14, 22);
-      doc.setFontSize(11);
-      doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 30);
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+      
+      // Premium Branding Header
+      doc.setFillColor(79, 70, 229); // Indigo 600
+      doc.rect(0, 0, 297, 40, 'F');
+      
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(24);
+      doc.setFont('helvetica', 'bold');
+      doc.text('GharSeva', 14, 20);
+      
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text('PLATFORM BUSINESS INTELLIGENCE REPORT', 14, 28);
+      doc.text(`DATE PERIMETER: ${new Date().toLocaleDateString()} | STATUS: AUDITED`, 14, 34);
 
       const tableData = filteredBookings.map(b => [
         (b.bookingId || b._id?.slice(-8)).toUpperCase() || 'N/A',
-        b.userId?.name || 'N/A',
+        b.userId?.name || 'Anonymous',
         b.serviceId?.name || b.serviceName || 'Service',
-        b.assignedWorkerId?.name || 'Unassigned',
+        b.assignedWorkerId?.name || 'Awaiting Partner',
         `Rs. ${b.totalAmount || 0}`,
-        `Rs. ${b.platformFee || 0}`,
-        `Rs. ${b.commissionFee || 0}`, // New Column
+        `Rs. ${(b.platformFee || 0) + (b.commissionFee || 0)}`,
         `Rs. ${b.workerEarnings || 0}`,
         `${b.commissionApplied || 0}%`,
-        b.completedAt ? new Date(b.completedAt).toLocaleDateString() : 'N/A'
+        b.status.toUpperCase(),
+        b.createdAt ? new Date(b.createdAt).toLocaleDateString() : 'N/A'
       ]);
 
       autoTable(doc, {
-        startY: 40,
-        head: [['ID', 'Customer', 'Service', 'Technician', 'Total', 'P. Fee (U)', 'Comm (W)', 'Net', 'Comm %', 'Date']],
+        startY: 50,
+        head: [['LEDGER ID', 'CUSTOMER', 'SERVICE', 'PARTNER', 'GROSS (USER)', 'PLATFORM NET', 'PAYOUT', 'COMM %', 'STATUS', 'POSTED DATE']],
         body: tableData,
-        theme: 'striped',
-        headStyles: { fillColor: [79, 70, 229] },
-        styles: { fontSize: 8 }
+        theme: 'grid',
+        headStyles: { fillColor: [79, 70, 229], textColor: [255, 255, 255], fontSize: 9, fontStyle: 'bold' },
+        bodyStyles: { fontSize: 8, textColor: [51, 65, 85] },
+        alternateRowStyles: { fillColor: [248, 250, 252] },
+        margin: { top: 50 },
+        columnStyles: {
+          4: { fontStyle: 'bold' },
+          5: { fontStyle: 'bold', textColor: [79, 70, 229] },
+          6: { fontStyle: 'bold', textColor: [16, 185, 129] }
+        }
       });
 
-      doc.save(`GharSeva_History_${Date.now()}.pdf`);
+      // Simple footer
+      const pageCount = doc.internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(148, 163, 184);
+        doc.text(`GharSeva Internal Audit Trail | Page ${i} of ${pageCount} | Automated Business Ledger`, 14, 200);
+      }
+
+      doc.save(`GharSeva_Internal_Audit_${Date.now()}.pdf`);
     } catch (err) {
-      alert('PDF generation failed');
+      console.error('PDF Error:', err);
+      alert('Professional PDF generation failed');
     } finally {
       setExporting(false);
     }
@@ -260,7 +287,35 @@ const Bookings = () => {
         isOpen={detailsModalOpen}
         onClose={() => setDetailsModalOpen(false)}
         title={`Oversight: ${selectedBooking?.bookingId || selectedBooking?._id.slice(-8).toUpperCase()}`}
-        footer={<button className="btn-primary" onClick={() => setDetailsModalOpen(false)}>Close Oversight</button>}
+        footer={
+          <div className="flex justify-between w-full">
+            <button className="btn-outline" onClick={() => {
+              const doc = new jsPDF();
+              doc.setFontSize(22); doc.setTextColor(79, 70, 229); doc.text('GharSeva Receipt', 14, 20);
+              doc.setFontSize(10); doc.setTextColor(100); doc.text(`Platform Ledger: ${selectedBooking.bookingId}`, 14, 28);
+              autoTable(doc, { 
+                startY: 35, 
+                head: [['Detail', 'Value']], 
+                body: [
+                  ['Service', selectedBooking.serviceId?.name],
+                  ['Customer', selectedBooking.userId?.name],
+                  ['Technician', selectedBooking.assignedWorkerId?.name],
+                  ['Base Price', `Rs. ${selectedBooking.price}`],
+                  ['Platform Fee', `Rs. ${selectedBooking.platformFee}`],
+                  ['Total Amount', `Rs. ${selectedBooking.totalAmount}`],
+                  ['Status', selectedBooking.status.toUpperCase()],
+                  ['Date', new Date(selectedBooking.createdAt).toLocaleString()]
+                ],
+                theme: 'striped',
+                headStyles: { fillColor: [79, 70, 229] }
+              });
+              doc.save(`GharSeva_Receipt_${selectedBooking.bookingId}.pdf`);
+            }}>
+              <Download size={16} className="mr-1" /> Download Receipt
+            </button>
+            <button className="btn-primary" onClick={() => setDetailsModalOpen(false)}>Close Oversight</button>
+          </div>
+        }
       >
         {selectedBooking && (
           <div className="booking-details-modal">

@@ -29,6 +29,26 @@ class BookingRepository {
       .sort({ createdAt: -1 });
   }
 
+  async findAvailableForWorker(workerId, categoryIds, lng, lat) {
+    // Find jobs that are PENDING_ACCEPTANCE, match categories, 
+    // and where this worker is NOT excluded.
+    return await Booking.find({
+      status: 'pending_acceptance',
+      assignedWorkerId: null,
+      excludedWorkerIds: { $ne: workerId },
+      // lng/lat proximity is usually handled at the service layer, 
+      // but for simplicity we'll match by categories here.
+      // In a high-scale app, we'd use $near or $geoWithin.
+      $or: [
+        { serviceId: { $in: categoryIds } }, // If populated
+        { categoryId: { $in: categoryIds } } // If raw
+      ]
+    }).populate('serviceId', 'name icon')
+      .populate('userId', 'name profilePicture')
+      .sort({ createdAt: -1 })
+      .limit(10);
+  }
+
   async updateStatus(id, status, workerId, additionalUpdates = {}) {
     // Standard update: requires workerId match for security
     const update = { status, ...additionalUpdates };

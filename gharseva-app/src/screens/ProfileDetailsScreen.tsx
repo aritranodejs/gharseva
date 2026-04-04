@@ -77,17 +77,28 @@ export default function ProfileDetailsScreen({ navigation }: any) {
         // Upload to backend (which routes to ImageKit or local storage)
         setUploadingImage(true);
         try {
-          const dataUri = `data:image/jpeg;base64,${base64}`;
-          const response = await api.post('auth/profile', { profilePicture: dataUri });
-          const resData = response.data.data;
-          // Update to the persistent URL returned from server
-          if (resData.profilePicture) {
-            setProfile(prev => ({ ...prev, profilePicture: resData.profilePicture }));
-          }
+          const formData = new FormData();
+          formData.append('profilePicture', {
+            uri: localUri,
+            type: 'image/jpeg',
+            name: `profile_${Date.now()}.jpg`
+          } as any);
+
+          await api.post('auth/profile', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+          });
+          
+          // CRITICAL: Clear local URI immediately to stop 404s for temporary files
+          // and re-fetch to get the server's clean path.
+          setProfile(prev => ({ ...prev, profilePicture: '' })); 
+          await fetchProfile();
+          
           showToast('Profile picture updated!', 'success');
         } catch (err) {
            console.error('Error uploading image:', err);
-           showToast('Image could not be uploaded. Local preview shown.', 'error');
+           showToast('Image could not be uploaded. Please try again.', 'error');
+           // Re-fetch to restore to previous server state if upload failed
+           await fetchProfile();
         } finally {
            setUploadingImage(false);
         }

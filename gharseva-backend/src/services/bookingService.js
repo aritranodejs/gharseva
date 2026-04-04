@@ -7,13 +7,35 @@ class BookingService {
     return require('../repositories/bookingRepository');
   }
 
-  async getWorkerBookings(workerId) {
-    const statuses = [
+  async getWorkerBookings(workerId, status) {
+    const statuses = status ? [status] : [
       BOOKING_STATUS.PENDING_ACCEPTANCE,
       BOOKING_STATUS.CONFIRMED,
       BOOKING_STATUS.IN_PROGRESS
     ];
-    return await this.bookingRepository.findByWorkerAndStatus(workerId, statuses);
+    
+    // 1. Get jobs already assigned to this worker
+    const assignedJobs = await this.bookingRepository.findByWorkerAndStatus(workerId, statuses);
+    
+    // 2. Get jobs available nearby (if not filtering for a specific already-assigned status)
+    let availableJobs = [];
+    if (!status || status === BOOKING_STATUS.PENDING_ACCEPTANCE) {
+      const worker = await Worker.findById(workerId);
+      if (worker && worker.isOnline) {
+        availableJobs = await this.bookingRepository.findAvailableForWorker(
+          workerId, 
+          worker.categories || [], 
+          worker.location?.coordinates[0], 
+          worker.location?.coordinates[1]
+        );
+      }
+    }
+
+    // Combine them into a single list or return both
+    return {
+      active: assignedJobs,
+      available: availableJobs
+    };
   }
 
   async getWorkerHistory(workerId) {
@@ -79,6 +101,9 @@ class BookingService {
     if (!booking) throw new Error('Booking not found');
 
     const updates = { ...additionalUpdates };
+    
+    // Explicitly handle array fields to prevent overwriting with single values
+    // if the controller passes them as arrays
     if (status === 'in_progress') {
         updates.startedAt = new Date();
     } else if (status === 'completed') {

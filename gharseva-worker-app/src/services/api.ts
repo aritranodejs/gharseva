@@ -6,9 +6,9 @@ import { Platform } from 'react-native';
 // We prioritize the environment variable if set by Expo
 const getBaseURL = () => {
   const envUrl = process.env.EXPO_PUBLIC_API_URL;
-  if (envUrl) return envUrl;
-
-  return 'http://127.0.0.1:5000/api/';
+  // Generic fallback for local development if .env is missing. 
+  // Custom: using your dev IP 192.168.1.6
+  return 'http://192.168.1.6:5000/api/';
 };
 
 export const API_URL = getBaseURL();
@@ -97,7 +97,25 @@ export const getImageUrl = (path?: string) => {
   if (!path) return null;
   
   const serverBase = API_URL_NO_SLASH.replace('/api', '');
+  const IMAGEKIT_BASE = 'https://ik.imagekit.io/zq0ku52lz';
 
+  // 1. Recognize direct data URIs (Failsafe)
+  if (path.startsWith('data:image/')) {
+    return path;
+  }
+
+  // 2. Clear known 'localhost/0' or 'file://' errors
+  if (path.includes('localhost/0') || (path.startsWith('file://') && !path.includes('data/user/0'))) {
+    return null;
+  }
+
+  // 3. Handle Cloud Paths (ImageKit)
+  // If path starts with /uploads, it's on ImageKit (as configured in backend)
+  if (path.startsWith('/uploads')) {
+    return `${IMAGEKIT_BASE}${path}`;
+  }
+
+  // 4. Handle Legacy / Absolute URLs
   if (path.startsWith('http')) {
     // Fix legacy localhost saves or mismatches
     if (path.includes('localhost:5000')) {
@@ -109,6 +127,7 @@ export const getImageUrl = (path?: string) => {
     return path;
   }
 
+  // 5. Handle local relative paths
   const cleanPath = path.startsWith('/') ? path.substring(1) : path;
   return `${serverBase}/${cleanPath}`;
 };

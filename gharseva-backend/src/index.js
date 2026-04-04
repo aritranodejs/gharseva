@@ -12,7 +12,7 @@ const app = express();
 
 // Middleware
 app.use(cors({
-  origin: ["http://localhost:3000", "http://localhost:5173", "https://gharseva-gamma.vercel.app"],
+  origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
   credentials: true
@@ -23,9 +23,18 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Serve uploaded profile images statically (with ImageKit redirect if enabled)
 const path = require('path');
 app.use('/uploads', (req, res, next) => {
+  // If ImageKit is enabled, redirect ALL requests there. 
+  // We no longer save local copies for PDFs/Docs when ImageKit is ON to save server space.
   if (process.env.IMAGEKIT_ENABLED === 'true') {
     return res.redirect(`${process.env.IMAGEKIT_URL_ENDPOINT}${req.baseUrl}${req.url}`);
   }
+  
+  // Set headers for PDFs if serving locally
+  if (/\.pdf$/i.test(req.url)) {
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'inline');
+  }
+  
   next();
 }, express.static(path.join(__dirname, '../uploads')));
 

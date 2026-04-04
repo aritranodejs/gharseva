@@ -448,7 +448,7 @@ export default function HomeScreen() {
                       </View>
                       <View style={styles.addressInfo}>
                         <Text style={styles.addressLabel}>{area.cityName}</Text>
-                        <Text style={styles.addressText}>{area.pincodes.map((p: any) => p.pincode).join(', ')}</Text>
+                        <Text style={styles.addressText}>{area.pincodes.map((p: any) => `${p.name} (${p.pincode})`).join(', ')}</Text>
                       </View>
                     </View>
                   ))}

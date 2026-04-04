@@ -158,6 +158,59 @@ const Settings = () => {
         </div>
 
         <div className="settings-section">
+          <div className="section-header">
+            <Zap size={20} color="#3B82F6" />
+            <h3>Transaction Methods</h3>
+          </div>
+          <div className="section-content">
+            <div className="toggle-item">
+              <div className="toggle-info">
+                 <p className="toggle-label font-bold">Accept Cash on Delivery (COD)</p>
+                 <p className="toggle-desc">Allow users to pay in cash after service completion.</p>
+              </div>
+              <label className="switch">
+                 <input 
+                   type="checkbox" 
+                   checked={settings.acceptCOD}
+                   onChange={(e) => setSettings({...settings, acceptCOD: e.target.checked})}
+                 />
+                 <span className="slider round"></span>
+              </label>
+            </div>
+
+            <div className="toggle-item">
+              <div className="toggle-info">
+                 <p className="toggle-label font-bold">Accept UPI Payments (Manual)</p>
+                 <p className="toggle-desc">Enable manual UPI ID collection during checkout.</p>
+              </div>
+              <label className="switch">
+                 <input 
+                   type="checkbox" 
+                   checked={settings.acceptUPI}
+                   onChange={(e) => setSettings({...settings, acceptUPI: e.target.checked})}
+                 />
+                 <span className="slider round"></span>
+              </label>
+            </div>
+
+            <div className="toggle-item opacity-50">
+              <div className="toggle-info">
+                 <p className="toggle-label font-bold">Razorpay Integration (Beta)</p>
+                 <p className="toggle-desc">Future: Toggle automated gateway payments.</p>
+              </div>
+              <label className="switch">
+                 <input 
+                   type="checkbox" 
+                   checked={settings.razorpayEnabled}
+                   disabled
+                 />
+                 <span className="slider round"></span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div className="settings-section">
              <div className="section-header">
                 <Zap size={20} color="#F59E0B" />
                 <h3>System Information</h3>

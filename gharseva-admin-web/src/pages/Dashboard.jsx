@@ -14,34 +14,41 @@ const Dashboard = () => {
   const [stats, setStats] = useState({
     totalBookings: 0,
     completedBookings: 0,
+    activeWorkers: 0,
+    usersCount: 0,
     totalRevenue: 0,
-    dailyRevenue: 0,
-    charts: { weekly: [], yearly: [] }
+    platformProfit: 0,
+    workerPayouts: 0,
+    chartData: []
   });
   const [settings, setSettings] = useState({
     platformFeeType: 'fixed',
-    platformFeeValue: 29
+    platformFeeValue: 29,
+    acceptCOD: true,
+    acceptUPI: true,
+    acceptCard: true,
+    acceptBank: true
   });
   const [recentBookings, setRecentBookings] = useState([]);
+  const [timeRange, setTimeRange] = useState('week');
   const [loading, setLoading] = useState(true);
   const [savingSettings, setSavingSettings] = useState(false);
   const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     fetchDashboardData();
-  }, []);
+  }, [timeRange]);
 
   const fetchDashboardData = async () => {
+    setLoading(true);
     try {
-      const [statsRes, settingsRes, bookingsRes] = await Promise.all([
-        api.get('admin/stats'),
-        api.get('admin/settings'),
-        api.get('admin/bookings')
+      const [statsRes, settingsRes] = await Promise.all([
+        api.get(`admin/stats?range=${timeRange}`),
+        api.get('admin/settings')
       ]);
-
       setStats(statsRes.data.data);
       setSettings(settingsRes.data.data);
-      setRecentBookings(bookingsRes.data.data?.slice(0, 5) || []);
+      setRecentBookings(statsRes.data.data.recentBookings || []);
     } catch (err) {
       console.error('Error fetching dashboard data:', err);
     } finally {
@@ -53,7 +60,7 @@ const Dashboard = () => {
     setSavingSettings(true);
     try {
       await api.patch('admin/settings', settings);
-      alert('Platform Fee settings updated successfully!');
+      alert('Platform configuration synchronized!');
     } catch (err) {
       alert('Failed to update settings');
     } finally {
@@ -61,97 +68,63 @@ const Dashboard = () => {
     }
   };
 
-  const exportToExcel = async () => {
-    setExporting(true);
+  const getTimeLabel = (id) => {
+    if (timeRange === 'day') return `${id}:00`;
+    if (timeRange === 'year') {
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      return months[id - 1];
+    }
+    return id.split('-').slice(1).join('/');
+  };
+
+  const chartData = stats.chartData?.map(d => ({
+    name: getTimeLabel(d._id),
+    revenue: d.revenue,
+    volume: d.volume
+  })) || [];
+
+  const handleExportExcel = () => {
     try {
-      const data = recentBookings.map(b => ({
+      const data = stats.recentBookings?.map(b => ({
         'Booking ID': b.bookingId || b._id,
-        'Customer': b.userId?.name || 'N/A',
-        'Contact': b.userId?.phoneNumber || 'N/A',
-        'Service': b.serviceId?.name || b.serviceName || 'Home Service',
-        'Technician': b.assignedWorkerId?.name || 'N/A',
+        'Service': b.serviceId?.name || 'Home Service',
+        'Customer': b.userId?.name || 'Anonymous',
+        'Schedule': new Date(b.schedule).toLocaleString(),
         'Total Amount': b.totalAmount,
-        'Platform Fee (User)': b.platformFee || 0,
-        'Commission Fee (Worker)': b.commissionFee || 0,
-        'Platform Profit': (b.platformFee || 0) + (b.commissionFee || 0),
-        'Technician Net Profit': b.workerEarnings || 0,
-        'Commission (%)': b.commissionApplied || 0,
-        'Status': b.status,
-        'Date': b.completedAt ? new Date(b.completedAt).toLocaleDateString() : 'N/A',
-        'Time': b.completedAt ? new Date(b.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A'
-      }));
+        'Admin Earnings': (b.platformFee || 0) + (b.commissionFee || 0),
+        'Status': b.status
+      })) || [];
 
       const ws = XLSX.utils.json_to_sheet(data);
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Revenue Report');
-      XLSX.writeFile(wb, `GharSeva_Revenue_${new Date().toISOString().split('T')[0]}.xlsx`);
+      XLSX.utils.book_append_sheet(wb, ws, "DashboardSummary");
+      XLSX.writeFile(wb, `GharSeva_Business_Report_${timeRange.toUpperCase()}_${Date.now()}.xlsx`);
     } catch (err) {
-      alert('Export failed');
-    } finally {
-      setExporting(false);
+      alert('Report generation failed');
     }
   };
-
-  const exportToPDF = async () => {
-    setExporting(true);
-    try {
-      const doc = new jsPDF({ orientation: 'landscape' });
-
-      doc.setFontSize(18);
-      doc.text('GharSeva Platform Revenue Report', 14, 22);
-      doc.setFontSize(11);
-      doc.setTextColor(100);
-      doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 30);
-
-      const tableData = recentBookings.map(b => [
-        (b.bookingId || b._id?.slice(-8)).toUpperCase() || 'N/A',
-        b.userId?.name || 'N/A',
-        b.serviceId?.name || b.serviceName || 'Service',
-        b.assignedWorkerId?.name || 'Unassigned',
-        `Rs. ${b.totalAmount || 0}`,
-        `Rs. ${b.platformFee || 0}`,
-        `Rs. ${b.commissionFee || 0}`,
-        `Rs. ${(b.platformFee || 0) + (b.commissionFee || 0)}`,
-        `Rs. ${b.workerEarnings || 0}`,
-        `${b.commissionApplied || 0}%`,
-        b.completedAt ? new Date(b.completedAt).toLocaleDateString() : 'N/A'
-      ]);
-
-      autoTable(doc, {
-        startY: 40,
-        head: [['ID', 'Customer', 'Service', 'Technician', 'Total', 'P.Fee(U)', 'Comm(W)', 'Plat Net', 'Tech Net', 'Comm%', 'Date']],
-        body: tableData,
-        theme: 'striped',
-        headStyles: { fillColor: [79, 70, 229] },
-        styles: { fontSize: 8 }
-      });
-
-      doc.save(`GharSeva_Report_${Date.now()}.pdf`);
-    } catch (err) {
-      alert('PDF generation failed');
-    } finally {
-      setExporting(false);
-    }
-  };
-
-  const chartData = stats.charts?.weekly?.map(d => ({
-    name: d._id.split('-').slice(1).join('/'),
-    revenue: d.revenue
-  })) || [];
 
   return (
     <div className="dashboard-page">
       <div className="page-header">
         <div>
           <h1>Platform Intelligence</h1>
-          <p>Real-time revenue tracking and performance analytics.</p>
+          <p>Analyzing {timeRange}ly growth and financial velocity.</p>
         </div>
         <div className="header-actions">
-          <button className="btn-outline" onClick={exportToExcel} disabled={exporting}>
-            <Download size={16} /> Export Excel
-          </button>
-          <button className="btn-primary" onClick={exportToPDF} disabled={exporting}>
-            <FileText size={16} /> Download PDF
+           <div className="time-pivot-bar mr-4">
+              {['day', 'week', 'month', 'year'].map(r => (
+                <button 
+                  key={r} 
+                  className={`pivot-btn ${timeRange === r ? 'active' : ''}`}
+                  onClick={() => setTimeRange(r)}
+                >
+                  {r.charAt(0).toUpperCase() + r.slice(1)}
+                </button>
+              ))}
+           </div>
+          <button className="btn-primary" onClick={handleExportExcel}>
+            <Download size={16} className="mr-1" /> Business Report
           </button>
         </div>
       </div>
@@ -162,9 +135,9 @@ const Dashboard = () => {
             <ShoppingBag size={24} color="#3B82F6" />
           </div>
           <div className="stat-info">
-            <h4>Total Bookings</h4>
-            <h2>{stats.totalBookings}</h2>
-            <p className="stat-sub">{stats.completedBookings} Successful completions</p>
+            <h4>{timeRange.toUpperCase()} Volume</h4>
+            <h2>{stats.chartData?.reduce((acc, d) => acc + d.volume, 0) || 0}</h2>
+            <p className="stat-sub">{stats.totalBookings} Total registrations</p>
           </div>
         </div>
 
@@ -173,9 +146,9 @@ const Dashboard = () => {
             <TrendingUp size={24} color="#10B981" />
           </div>
           <div className="stat-info">
-            <h4>Lifetime Profit</h4>
-            <h2>₹{stats.totalRevenue.toLocaleString()}</h2>
-            <p className="stat-sub">Aggregated platform fees</p>
+            <h4>Platform Net (Profit)</h4>
+            <h2 className="text-emerald-600">₹{(stats.platformProfit || 0).toLocaleString()}</h2>
+            <p className="stat-sub">From {timeRange} completions</p>
           </div>
         </div>
 
@@ -184,9 +157,9 @@ const Dashboard = () => {
             <DollarSign size={24} color="#8B5CF6" />
           </div>
           <div className="stat-info">
-            <h4>24h Revenue</h4>
-            <h2>₹{stats.dailyRevenue.toLocaleString()}</h2>
-            <p className="stat-sub">From new completions</p>
+            <h4>Fleet Net (Payouts)</h4>
+            <h2 className="text-indigo-600">₹{(stats.workerPayouts || 0).toLocaleString()}</h2>
+            <p className="stat-sub">Paid to professionals</p>
           </div>
         </div>
 
@@ -195,9 +168,9 @@ const Dashboard = () => {
             <CheckCircle size={24} color="#F59E0B" />
           </div>
           <div className="stat-info">
-            <h4>Success Rate</h4>
-            <h2>{stats.totalBookings > 0 ? Math.round((stats.completedBookings / stats.totalBookings) * 100) : 0}%</h2>
-            <p className="stat-sub">Service delivery efficiency</p>
+            <h4>Active Fleet</h4>
+            <h2>{stats.activeWorkers}</h2>
+            <p className="stat-sub">{stats.usersCount} Trusted users</p>
           </div>
         </div>
       </div>
@@ -208,27 +181,31 @@ const Dashboard = () => {
           <div className="card-header">
             <div className="title-box">
               <BarChart2 size={20} color="#6366F1" />
-              <h3>Weekly Revenue Trend (Platform Fee)</h3>
+              <h3>{timeRange.toUpperCase()}ly Financial Velocity</h3>
             </div>
           </div>
           <div className="chart-container">
-            <ResponsiveContainer width="100%" height={300}>
-              <AreaChart data={chartData}>
-                <defs>
-                  <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#6366F1" stopOpacity={0.1} />
-                    <stop offset="95%" stopColor="#6366F1" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94A3B8', fontSize: 12 }} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94A3B8', fontSize: 12 }} />
-                <Tooltip
-                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
-                />
-                <Area type="monotone" dataKey="revenue" stroke="#6366F1" strokeWidth={3} fillOpacity={1} fill="url(#colorRev)" />
-              </AreaChart>
-            </ResponsiveContainer>
+            {loading ? (
+              <div className="loading-chart h-[300px] flex items-center justify-center text-xs text-slate-300 font-black tracking-widest animate-pulse">AGREGRATING TEMPORAL DATA...</div>
+            ) : (
+              <ResponsiveContainer width="100%" height={300}>
+                <AreaChart data={chartData}>
+                  <defs>
+                    <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#6366F1" stopOpacity={0.1} />
+                      <stop offset="95%" stopColor="#6366F1" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94A3B8', fontSize: 10 }} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94A3B8', fontSize: 10 }} />
+                  <Tooltip
+                    contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', padding: '12px' }}
+                  />
+                  <Area type="monotone" dataKey="revenue" stroke="#6366F1" strokeWidth={4} fillOpacity={1} fill="url(#colorRev)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
       </div>
@@ -297,23 +274,33 @@ const Dashboard = () => {
               </div>
             </div>
 
-            <div className="form-group">
-              <label>{settings.platformFeeType === 'fixed' ? 'Fixed Amount per Booking (₹)' : 'Variable Fee Percentage (%)'}</label>
-              <input
-                type="number"
-                value={settings.platformFeeValue}
-                onChange={(e) => setSettings({ ...settings, platformFeeValue: Number(e.target.value) })}
-                className="fee-input"
-              />
+            <div className="form-group" style={{ marginTop: '24px' }}>
+              <label>Global Payment Orchestration</label>
+              <div className="payment-grid">
+                {[
+                  { id: 'acceptCOD', label: 'Cash on Delivery', icon: '💵' },
+                  { id: 'acceptUPI', label: 'UPI / QR Payments', icon: '📱' },
+                  { id: 'acceptCard', label: 'Credit / Debit Cards', icon: '💳' },
+                  { id: 'acceptBank', label: 'Direct Bank Transfer', icon: '🏦' }
+                ].map(method => (
+                  <button
+                    key={method.id}
+                    className={`payment-toggle-card ${settings[method.id] ? 'active' : ''}`}
+                    onClick={() => setSettings({ ...settings, [method.id]: !settings[method.id] })}
+                  >
+                    <span className="method-icon">{method.icon}</span>
+                    <span className="method-label">{method.label}</span>
+                    <div className="toggle-switch">
+                      <div className="switch-knob"></div>
+                    </div>
+                  </button>
+                ))}
+              </div>
             </div>
 
             <button className="save-settings-btn" onClick={handleUpdateSettings} disabled={savingSettings}>
-              {savingSettings ? 'Applying Changes...' : 'Save Global Config'}
+              {savingSettings ? 'Synchronizing Node...' : 'Save Global Configuration'}
             </button>
-          </div>
-
-          <div className="config-footer">
-            <p>Changes will apply to all new scheduled services.</p>
           </div>
         </div>
       </div>

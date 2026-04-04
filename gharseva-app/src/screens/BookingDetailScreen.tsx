@@ -337,7 +337,7 @@ export default function BookingDetailScreen({ route, navigation }: any) {
              <ActivityIndicator color="#4F46E5" style={{ marginBottom: 16 }} />
              <Text style={styles.searchingText}>Finding the best professional near you...</Text>
              
-             {booking.status === 'searching_worker' && (
+             {['searching_worker', 'matching', 'pending_acceptance', 'pending'].includes(booking.status) && (
                <TouchableOpacity 
                  style={[styles.rebroadcastBtn, { opacity: rebroadcasting ? 0.7 : 1 }]} 
                  onPress={handleRebroadcast}

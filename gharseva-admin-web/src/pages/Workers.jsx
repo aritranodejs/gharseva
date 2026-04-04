@@ -171,6 +171,17 @@ const Workers = () => {
     }
   };
 
+  const handleDeleteWorker = async (id) => {
+    if (!window.confirm('IRREVERSIBLE ACTION: Delete this professional and all their platform data?')) return;
+    try {
+      await api.delete(`admin/workers/${id}`);
+      setWorkers(workers.filter(w => w._id !== id));
+      alert('Professional profile removed successfully');
+    } catch (err) {
+      alert('Failed to remove professional');
+    }
+  };
+
   const filteredWorkers = workers.filter(w => 
     w.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
     w.phoneNumber?.includes(searchTerm)
@@ -276,6 +287,9 @@ const Workers = () => {
                         </button>
                         <button className="btn-icon" onClick={() => handleOpenUpsert(worker)} title="Edit Account">
                            <Edit3 size={18} />
+                        </button>
+                        <button className="btn-icon btn-danger" onClick={() => handleDeleteWorker(worker._id)} title="Delete Professional">
+                           <Trash2 size={18} />
                         </button>
                       </div>
                     </td>
@@ -486,7 +500,27 @@ const Workers = () => {
           </>
         }
       >
-        <div className="upsert-form">
+        <div className="upsert-form p-4">
+           {/* Unified Platform Avatar Sync UI - Strict Constraints Updated */}
+           <div className="flex items-center gap-6 mb-8 bg-slate-50 p-6 rounded-3xl border border-slate-100">
+              <div className="relative w-16 h-16 flex-shrink-0">
+                <img 
+                  src={getImageUrl(selectedWorker?.profilePicture) || 'https://via.placeholder.com/80'} 
+                  alt="Profile" 
+                  style={{ width: '64px', height: '64px', minWidth: '64px', minHeight: '64px', borderRadius: '50%', objectFit: 'cover' }}
+                  className="border-2 border-indigo-100 shadow-md ring-4 ring-white"
+                />
+                <label className="absolute -bottom-1 -right-1 bg-indigo-600 text-white p-1 rounded-full cursor-pointer shadow-lg hover:bg-indigo-700 transition-transform active:scale-90 z-10">
+                  <Edit3 size={14} />
+                  <input type="file" hidden onChange={(e) => handleDocUpload('profilePicture', e)} />
+                </label>
+              </div>
+              <div className="flex-1 overflow-hidden">
+                <p className="text-[11px] font-black text-indigo-600 uppercase tracking-widest mb-0.5">Asset synchronization</p>
+                <p className="text-sm font-bold text-slate-800 truncate">Professional Platform Avatar</p>
+              </div>
+           </div>
+
            <Input label="Full Name" value={workerForm.name} onChange={(e) => setWorkerForm({...workerForm, name: e.target.value})} />
            <Input label="Phone Number" value={workerForm.phoneNumber} onChange={(e) => setWorkerForm({...workerForm, phoneNumber: e.target.value})} />
            {!selectedWorker && <Input label="Initial Password" type="password" value={workerForm.password} onChange={(e) => setWorkerForm({...workerForm, password: e.target.value})} />}

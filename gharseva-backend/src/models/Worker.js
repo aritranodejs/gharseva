@@ -30,7 +30,9 @@ const workerSchema = new mongoose.Schema(
       coordinates: { type: [Number], default: [0, 0] } // [lng, lat]
     }
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+  }
 );
 
 // 2dsphere index for $near geo queries

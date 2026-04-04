@@ -7,6 +7,7 @@ import Services from './pages/Services';
 import Areas from './pages/Areas';
 import Workers from './pages/Workers';
 import Bookings from './pages/Bookings';
+import Customers from './pages/Customers';
 import Settings from './pages/Settings';
 import Login from './pages/Login';
 
@@ -26,6 +27,7 @@ function App() {
           <Route path="/" element={<MainLayout />}>
             <Route index element={<Dashboard />} />
             <Route path="services" element={<Services />} />
+            <Route path="customers" element={<Customers />} />
             <Route path="areas" element={<Areas />} />
             <Route path="workers" element={<Workers />} />
             <Route path="bookings" element={<Bookings />} />

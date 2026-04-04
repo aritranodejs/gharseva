@@ -21,7 +21,7 @@ const bookingSchema = mongoose.Schema(
     workerEarnings: { type: Number, default: 0 }, // Net for Worker
     commissionApplied: { type: Number, default: 0 }, // % used for this job
     totalAmount: { type: Number, default: 0 },    // Base price + platform fee
-    paymentMethod: { type: String, enum: ['upi', 'cash', 'card', 'online'], default: 'cash' },
+    paymentMethod: { type: String, enum: ['upi', 'cash', 'card', 'online', 'bank'], default: 'cash' },
     paymentStatus: { type: String, enum: ['pending', 'paid', 'failed', 'refunded'], default: 'pending' },
     upiId: { type: String },
     cancelReason: { type: String },

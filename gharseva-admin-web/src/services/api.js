@@ -64,8 +64,38 @@ api.interceptors.response.use(
 
 export const getImageUrl = (path) => {
   if (!path) return null;
-  if (path.startsWith('http') || path.startsWith('data:image/')) return path;
+  
+  const IMAGEKIT_BASE = 'https://ik.imagekit.io/zq0ku52lz';
   const baseUrl = import.meta.env.VITE_IMAGE_BASE_URL || 'http://127.0.0.1:5000';
+
+  // 1. Recognize direct data URIs (Failsafe)
+  if (path.startsWith('data:image/')) {
+    return path;
+  }
+
+  // 2. Clear known 'localhost/0' or 'file://' errors
+  if (path.includes('localhost/0') || path.startsWith('file://')) {
+    return null;
+  }
+
+  // 3. Handle Cloud Paths (ImageKit)
+  if (path.startsWith('/uploads')) {
+    return `${IMAGEKIT_BASE}${path}`;
+  }
+
+  // 4. Handle Legacy / Absolute URLs
+  if (path.startsWith('http')) {
+    // Fix legacy localhost saves or mismatches
+    if (path.includes('localhost:5000')) {
+      return path.replace('http://localhost:5000', baseUrl);
+    }
+    if (path.includes('127.0.0.1:5000')) {
+      return path.replace('http://127.0.0.1:5000', baseUrl);
+    }
+    return path;
+  }
+
+  // 5. Handle local relative paths
   const cleanPath = path.startsWith('/') ? path.slice(1) : path;
   return `${baseUrl}/${cleanPath}`;
 };

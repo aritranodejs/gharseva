@@ -11,7 +11,14 @@ class BookingController {
       };
       // Correctly call the user booking creation service
       const booking = await bookingService.createUserBooking(req.user.id, req.body);
-      sendSuccess(res, booking, 'Booking created successfully', 201);
+      
+      // Trigger Assignment/Broadcast to nearby workers
+      const assignmentService = require('../services/assignmentService');
+      assignmentService.assignWorkerToBooking(booking._id).catch(err => {
+        console.error('[BookingController] Broadcast Error:', err);
+      });
+
+      sendSuccess(res, booking, 'Booking created successfully. Finding professionals...', 201);
     } catch (err) {
       sendError(res, err.message, 400);
     }
@@ -61,16 +68,24 @@ class BookingController {
   async updateStatus(req, res) {
     try {
       const { id } = req.params;
-      const { status, cancellationReason, otp } = req.body;
+      const { status, reason, cancellationReason, otp } = req.body;
       const uploadFiles = req.files || {};
       
-      const additionalUpdates = { cancellationReason };
+      const additionalUpdates = { 
+        cancelReason: reason || cancellationReason 
+      };
 
-      if (uploadFiles['beforeServiceImage']) {
-        additionalUpdates.beforeServiceImage = await uploadFileBuffer(uploadFiles['beforeServiceImage'][0], '/uploads/beforeServiceImages');
+      if (uploadFiles['beforeServiceImages']) {
+        console.log(`[Evidence] Attempting Cloud upload for ${uploadFiles['beforeServiceImages'].length} BEFORE images...`);
+        additionalUpdates.beforeServiceImages = await Promise.all(
+          uploadFiles['beforeServiceImages'].map(file => uploadFileBuffer(file, 'uploads/beforeServiceImages'))
+        );
       }
-      if (uploadFiles['afterServiceImage']) {
-        additionalUpdates.afterServiceImage = await uploadFileBuffer(uploadFiles['afterServiceImage'][0], '/uploads/afterServiceImages');
+      if (uploadFiles['afterServiceImages']) {
+        console.log(`[Evidence] Attempting Cloud upload for ${uploadFiles['afterServiceImages'].length} AFTER images...`);
+        additionalUpdates.afterServiceImages = await Promise.all(
+          uploadFiles['afterServiceImages'].map(file => uploadFileBuffer(file, 'uploads/afterServiceImages'))
+        );
       }
 
       const booking = await bookingService.updateBookingStatus(id, req.worker._id, status, null, otp, additionalUpdates);
@@ -103,10 +118,17 @@ class BookingController {
   async rebroadcast(req, res) {
     try {
       const { id } = req.params;
+      const Booking = require('../models/Booking');
+      
+      // Clear excluded workers to give everyone a fresh chance
+      await Booking.findByIdAndUpdate(id, { excludedWorkerIds: [] });
+
       const assignmentService = require('../services/assignmentService');
       await assignmentService.assignWorkerToBooking(id);
+      
       sendSuccess(res, null, 'Searching for professionals...');
     } catch (err) {
+      console.error('[BookingController] Rebroadcast Error:', err.message);
       sendError(res, err.message, 400);
     }
   }

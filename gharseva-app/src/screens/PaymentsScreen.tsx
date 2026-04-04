@@ -30,6 +30,7 @@ export default function PaymentsScreen({ navigation }: any) {
   
   // Custom Loading
   const [loading, setLoading] = useState(true);
+  const [platformSettings, setPlatformSettings] = useState<any>(null);
 
   // UPI Verification state
   const [isVerifying, setIsVerifying] = useState(false);
@@ -66,8 +67,13 @@ export default function PaymentsScreen({ navigation }: any) {
 
   const fetchMethods = async () => {
     try {
-      const { data: response } = await api.get('payments/methods');
-      const methodList = response.data || [];
+      const [methodsRes, settingsRes] = await Promise.all([
+        api.get('payments/methods'),
+        api.get('public/settings')
+      ]);
+      
+      const methodList = methodsRes.data.data || [];
+      setPlatformSettings(settingsRes.data.data);
       
       setCards(methodList.filter((m: any) => m.type === 'card').map((m: any) => ({
          id: m._id,
@@ -82,7 +88,7 @@ export default function PaymentsScreen({ navigation }: any) {
       setUpiIds(formatUpi);
     } catch(err) {
       console.error(err);
-      showToast('Failed to load payment methods.', 'error');
+      showToast('Failed to load platform configuration.', 'error');
     } finally {
       setLoading(false);
     }
@@ -204,70 +210,83 @@ export default function PaymentsScreen({ navigation }: any) {
         </View>
 
         {/* UPI Section */}
-        <Text style={styles.subTitle}>UPI PAYMENT</Text>
-        <View style={styles.upiAppsRow}>
-          {UPI_APPS.slice(0,3).map(app => (
-            <View key={app.id} style={styles.upiAppChip}>
-              <View style={[styles.upiDot, { backgroundColor: app.color }]} />
-              <Text style={styles.upiAppName}>{app.name}</Text>
-            </View>
-          ))}
-        </View>
+        {platformSettings?.acceptUPI !== false && (
+          <>
+            <Text style={styles.subTitle}>UPI PAYMENT</Text>
+            <View style={{ opacity: platformSettings?.acceptUPI ? 1 : 0.5 }}>
+              <View style={styles.upiAppsRow}>
+                {UPI_APPS.slice(0,3).map(app => (
+                  <View key={app.id} style={styles.upiAppChip}>
+                    <View style={[styles.upiDot, { backgroundColor: app.color }]} />
+                    <Text style={styles.upiAppName}>{app.name}</Text>
+                  </View>
+                ))}
+              </View>
 
-        {upiIds.length > 0 && upiIds.map((upi, idx) => (
-          <View key={upi.id || `upi-${idx}`} style={styles.upiCard}>
-            <View style={[styles.upiIconBox, { backgroundColor: upi.color + '20' }]}>
-              <Smartphone size={20} color={upi.color} />
-            </View>
-            <View style={styles.upiInfo}>
-              <Text style={styles.upiIdText}>{upi.upiId}</Text>
-              <Text style={styles.upiAppLabel}>{upi.app}</Text>
-            </View>
-            <TouchableOpacity onPress={() => handleDeleteMethod(upi.id, 'upi')} style={styles.upiDelete}>
-              <X size={16} color="#EF4444" />
-            </TouchableOpacity>
-          </View>
-        ))}
+              {upiIds.length > 0 && upiIds.map((upi, idx) => (
+                <View key={upi.id || `upi-${idx}`} style={styles.upiCard}>
+                  <View style={[styles.upiIconBox, { backgroundColor: upi.color + '20' }]}>
+                    <Smartphone size={20} color={upi.color} />
+                  </View>
+                  <View style={styles.upiInfo}>
+                    <Text style={styles.upiIdText}>{upi.upiId}</Text>
+                    <Text style={styles.upiAppLabel}>{upi.app}</Text>
+                  </View>
+                  <TouchableOpacity onPress={() => handleDeleteMethod(upi.id, 'upi')} style={styles.upiDelete}>
+                    <X size={16} color="#EF4444" />
+                  </TouchableOpacity>
+                </View>
+              ))}
 
-        <TouchableOpacity style={styles.addUpiBtn} onPress={() => setUpiModalVisible(true)}>
-          <Smartphone size={20} color="#4F46E5" />
-          <Text style={styles.addUpiBtnText}>Add UPI ID</Text>
-        </TouchableOpacity>
-
-        <View style={styles.divider} />
+              <TouchableOpacity style={styles.addUpiBtn} onPress={() => setUpiModalVisible(true)}>
+                <Smartphone size={20} color="#4F46E5" />
+                <Text style={styles.addUpiBtnText}>Add UPI ID</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.divider} />
+          </>
+        )}
 
         {/* Saved Cards */}
-        <Text style={styles.subTitle}>SAVED CARDS</Text>
-        {cards.map((card, idx) => (
-          <View key={card.id || `card-${idx}`} style={styles.cardItem}>
-             <View style={styles.cardIconBox}><CreditCard size={22} color="#4F46E5" /></View>
-             <View style={[styles.cardInfo, { flex: 1 }]}>
-               <Text style={styles.cardNumber}>{card.number}</Text>
-               <Text style={styles.cardExpiry}>Expires {card.expiry}</Text>
-             </View>
-             <View style={styles.brandBadge}><Text style={styles.brandText}>{card.brand}</Text></View>
-             <TouchableOpacity onPress={() => handleDeleteMethod(card.id, 'card')} style={{ marginLeft: 16, padding: 8 }}>
-                 <Trash2 size={18} color="#EF4444" />
-             </TouchableOpacity>
-          </View>
-        ))}
+        {platformSettings?.acceptCard !== false && (
+          <>
+            <Text style={styles.subTitle}>SAVED CARDS</Text>
+            {cards.map((card, idx) => (
+              <View key={card.id || `card-${idx}`} style={styles.cardItem}>
+                 <View style={styles.cardIconBox}><CreditCard size={22} color="#4F46E5" /></View>
+                 <View style={[styles.cardInfo, { flex: 1 }]}>
+                   <Text style={styles.cardNumber}>{card.number}</Text>
+                   <Text style={styles.cardExpiry}>Expires {card.expiry}</Text>
+                 </View>
+                 <View style={styles.brandBadge}><Text style={styles.brandText}>{card.brand}</Text></View>
+                 <TouchableOpacity onPress={() => handleDeleteMethod(card.id, 'card')} style={{ marginLeft: 16, padding: 8 }}>
+                     <Trash2 size={18} color="#EF4444" />
+                 </TouchableOpacity>
+              </View>
+            ))}
 
-        <TouchableOpacity style={styles.addCardBtn} onPress={() => setCardModalVisible(true)}>
-          <Plus size={20} color="#6B7280" />
-          <Text style={styles.addCardBtnText}>Add Debit/Credit Card</Text>
-        </TouchableOpacity>
+            <TouchableOpacity style={styles.addCardBtn} onPress={() => setCardModalVisible(true)}>
+              <Plus size={20} color="#6B7280" />
+              <Text style={styles.addCardBtnText}>Add Debit/Credit Card</Text>
+            </TouchableOpacity>
 
-        <View style={styles.divider} />
+            <View style={styles.divider} />
+          </>
+        )}
 
-        <Text style={styles.subTitle}>OTHER OPTIONS</Text>
-        <View style={styles.codRow}>
-          <View style={styles.greenDot} />
-          <View>
-            <Text style={styles.codText}>Cash After Service (COD)</Text>
-            <Text style={styles.codSub}>Pay at your doorstep</Text>
-          </View>
-          <Check size={18} color="#10B981" style={{ marginLeft: 'auto' }} />
-        </View>
+        {platformSettings?.acceptCOD !== false && (
+          <>
+            <Text style={styles.subTitle}>OTHER OPTIONS</Text>
+            <View style={styles.codRow}>
+              <View style={styles.greenDot} />
+              <View>
+                <Text style={styles.codText}>Cash After Service (COD)</Text>
+                <Text style={styles.codSub}>Pay at your doorstep</Text>
+              </View>
+              <Check size={18} color="#10B981" style={{ marginLeft: 'auto' }} />
+            </View>
+          </>
+        )}
       </ScrollView>
 
       {/* Add UPI Modal */}

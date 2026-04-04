@@ -17,6 +17,9 @@ router.get('/settings', async (req, res) => {
       platformFeeValue: settings.platformFeeValue || 0,
       isPremiumEnabled: settings.isPremiumEnabled || false,
       isLuxuryEnabled: settings.isLuxuryEnabled || false,
+      acceptCOD: settings.acceptCOD !== undefined ? settings.acceptCOD : true,
+      acceptUPI: settings.acceptUPI !== undefined ? settings.acceptUPI : true,
+      razorpayEnabled: settings.razorpayEnabled || false,
       workerCommissionPercentage: settings.workerCommissionPercentage || 10,
       minJobsForCommission: settings.minJobsForCommission || 10
     };

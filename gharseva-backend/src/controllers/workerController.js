@@ -57,25 +57,39 @@ class WorkerController {
       const uploadFiles = req.files || {};
       const updates = { ...req.body };
       
-      if (uploadFiles['profilePicture']) {
-         updates.profilePicture = await uploadFileBuffer(uploadFiles['profilePicture'][0], '/uploads/profilePicture');
-      }
-      if (uploadFiles['aadhaarImage']) {
-         updates.aadhaarImage = await uploadFileBuffer(uploadFiles['aadhaarImage'][0], '/uploads/aadhaarImage');
-      }
-      if (uploadFiles['panImage']) {
-         updates.panImage = await uploadFileBuffer(uploadFiles['panImage'][0], '/uploads/panImage');
-      }
-      if (uploadFiles['policeVerification']) {
-         updates.policeVerification = await uploadFileBuffer(uploadFiles['policeVerification'][0], '/uploads/policeVerification');
-      }
-      if (uploadFiles['certification']) {
-         updates.certification = await uploadFileBuffer(uploadFiles['certification'][0], '/uploads/certification');
+      // Safety parsing for JSON fields from FormData
+      const safeParse = (val) => {
+        if (!val || val === 'undefined' || val === 'null') return undefined;
+        try {
+          return typeof val === 'string' ? JSON.parse(val) : val;
+        } catch (e) {
+          console.error(`[WorkerController] JSON Parse Error for value: ${val}`, e.message);
+          return undefined;
+        }
+      };
+
+      if (updates.categories) updates.categories = safeParse(updates.categories);
+      if (updates.pincodes) updates.pincodes = safeParse(updates.pincodes);
+
+      // Handle all document fields
+      const docFields = [
+        { key: 'profilePicture', folder: '/uploads/profilePicture' },
+        { key: 'aadhaarImage', folder: '/uploads/aadhaarImage' },
+        { key: 'panImage', folder: '/uploads/panImage' },
+        { key: 'policeVerification', folder: '/uploads/policeVerification' },
+        { key: 'certification', folder: '/uploads/certification' }
+      ];
+
+      for (const field of docFields) {
+        if (uploadFiles[field.key]) {
+          updates[field.key] = await uploadFileBuffer(uploadFiles[field.key][0], field.folder);
+        }
       }
       
       const updatedWorker = await workerService.updateWorkerProfile(req.worker._id, updates);
       sendSuccess(res, updatedWorker, 'Profile updated');
     } catch (err) {
+      console.error('[WorkerController] Update Profile Error:', err.message);
       sendError(res, err.message, 400);
     }
   }

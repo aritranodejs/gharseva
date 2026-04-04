@@ -40,6 +40,10 @@ const MainLayout = () => {
             <ShoppingBag size={20} />
             <span>Services</span>
           </NavLink>
+          <NavLink to="/customers" onClick={closeSidebar} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
+            <Users size={20} />
+            <span>Customers</span>
+          </NavLink>
           <NavLink to="/areas" onClick={closeSidebar} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
             <MapPin size={20} />
             <span>Service Areas</span>
