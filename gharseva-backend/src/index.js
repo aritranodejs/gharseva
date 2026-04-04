@@ -20,9 +20,14 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' })); // Support large base64 images
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Serve uploaded profile images statically
+// Serve uploaded profile images statically (with ImageKit redirect if enabled)
 const path = require('path');
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+app.use('/uploads', (req, res, next) => {
+  if (process.env.IMAGEKIT_ENABLED === 'true') {
+    return res.redirect(`${process.env.IMAGEKIT_URL_ENDPOINT}${req.baseUrl}${req.url}`);
+  }
+  next();
+}, express.static(path.join(__dirname, '../uploads')));
 
 // Request logging middleware
 app.use((req, res, next) => {

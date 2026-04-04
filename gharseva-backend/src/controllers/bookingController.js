@@ -9,7 +9,8 @@ class BookingController {
         userId: req.user.id,
         ...req.body
       };
-      const booking = await bookingService.createBooking(bookingData);
+      // Correctly call the user booking creation service
+      const booking = await bookingService.createUserBooking(req.user.id, req.body);
       sendSuccess(res, booking, 'Booking created successfully', 201);
     } catch (err) {
       sendError(res, err.message, 400);
